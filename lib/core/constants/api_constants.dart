@@ -1,3 +1,5 @@
+import 'map_constants.dart';
+
 class ApiConstants {
   // Base server URL (configured for local dev / emulator / production)
   // Android emulator typically accesses host machine at 10.0.2.2:8000
@@ -6,8 +8,8 @@ class ApiConstants {
   // Toggle for Mock API Mode (Backend independent development)
   static const bool isMockMode = true;
 
-  // MapLibre Vector Map Style URL
-  static const String mapLibreStyleUrl = 'https://demotiles.maplibre.org/style.json';
+  // MapLibre Vector Map Style URL (Configured in MapConstants)
+  static String get mapLibreStyleUrl => MapConstants.defaultStyleUrl;
 
   // Valhalla OpenStreetMap Routing Engine endpoint
   static const String valhallaBaseUrl = 'https://valhalla1.openstreetmap.de/route';

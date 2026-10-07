@@ -83,5 +83,93 @@ void main() {
       expect(find.text('Valhalla Route'), findsOneWidget);
       expect(find.text('Turn-by-Turn Directions:'), findsOneWidget);
     });
+
+    testWidgets('MapScreen renders floating action controls (My Location, Focus Device, Layers)', (WidgetTester tester) async {
+      final testDevice = DeviceModel(
+        id: 101,
+        name: 'Rajini Phone',
+        deviceType: 'Android',
+        isOnline: true,
+        batteryLevel: 72,
+        lastSeen: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: MapScreen(device: testDevice),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Check My Location FAB
+      expect(find.byTooltip('My Location'), findsOneWidget);
+      await tester.tap(find.byTooltip('My Location'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Check Focus Device FAB
+      expect(find.byTooltip('Focus Device'), findsOneWidget);
+      await tester.tap(find.byTooltip('Focus Device'));
+      await tester.pump();
+
+      // Check Layers FAB and bottom sheet
+      expect(find.byTooltip('Map Layers'), findsOneWidget);
+      await tester.tap(find.byTooltip('Map Layers'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Map Styles & Layers'), findsOneWidget);
+      expect(find.text('Liberty (Detailed)'), findsOneWidget);
+      expect(find.text('Bright (High Contrast)'), findsOneWidget);
+      expect(find.text('Voyager (Navigation)'), findsOneWidget);
+      expect(find.text('Dark Mode'), findsOneWidget);
+
+      // Select Bright style
+      await tester.tap(find.text('Bright (High Contrast)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Map Styles & Layers'), findsNothing);
+    });
+
+    testWidgets('MapScreen top search bar accepts input and displays autocomplete suggestions', (WidgetTester tester) async {
+      final testDevice = DeviceModel(
+        id: 101,
+        name: 'Rajini Phone',
+        deviceType: 'Android',
+        isOnline: true,
+        batteryLevel: 72,
+        lastSeen: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: MapScreen(device: testDevice),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Enter search query
+      final searchInput = find.byType(TextField);
+      expect(searchInput, findsOneWidget);
+
+      await tester.enterText(searchInput, 'Station');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Verify autocomplete suggestion appears
+      expect(find.text('Central Railway Station'), findsOneWidget);
+
+      // Tap suggestion
+      await tester.tap(find.text('Central Railway Station'));
+      await tester.pumpAndSettle();
+
+      // Confirm feedback snackbar or selected query
+      expect(find.text('Central Railway Station'), findsWidgets);
+    });
   });
 }
