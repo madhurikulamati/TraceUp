@@ -6,6 +6,12 @@ class ApiConstants {
   // Toggle for Mock API Mode (Backend independent development)
   static const bool isMockMode = true;
 
+  // MapLibre Vector Map Style URL
+  static const String mapLibreStyleUrl = 'https://demotiles.maplibre.org/style.json';
+
+  // Valhalla OpenStreetMap Routing Engine endpoint
+  static const String valhallaBaseUrl = 'https://valhalla1.openstreetmap.de/route';
+
   // Authentication endpoints
   static const String registerEndpoint = 'auth/register/';
   static const String loginEndpoint = 'auth/login/';

@@ -195,7 +195,7 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                           subtitle: 'View live GPS position on interactive map',
                           color: AppColors.primary,
                           onTap: () {
-                            Navigator.pushNamed(context, AppRoutes.location);
+                            Navigator.pushNamed(context, AppRoutes.map, arguments: device);
                           },
                         ),
                         _buildActionTile(
