@@ -7,6 +7,7 @@ class CustomButton extends StatelessWidget {
   final bool isLoading;
   final bool isOutlined;
   final IconData? icon;
+  final Color? backgroundColor;
 
   const CustomButton({
     super.key,
@@ -15,27 +16,37 @@ class CustomButton extends StatelessWidget {
     this.isLoading = false,
     this.isOutlined = false,
     this.icon,
+    this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     if (isOutlined) {
       return OutlinedButton(
+        style: backgroundColor != null
+            ? OutlinedButton.styleFrom(
+                foregroundColor: backgroundColor,
+                side: BorderSide(color: backgroundColor!),
+              )
+            : null,
         onPressed: isLoading ? null : onPressed,
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  valueColor: AlwaysStoppedAnimation<Color>(backgroundColor ?? AppColors.primary),
                 ),
               )
-            : _buildContent(AppColors.primary),
+            : _buildContent(backgroundColor ?? AppColors.primary),
       );
     }
 
     return ElevatedButton(
+      style: backgroundColor != null
+          ? ElevatedButton.styleFrom(backgroundColor: backgroundColor)
+          : null,
       onPressed: isLoading ? null : onPressed,
       child: isLoading
           ? const SizedBox(

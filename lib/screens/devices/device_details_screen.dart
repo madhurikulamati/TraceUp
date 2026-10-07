@@ -6,6 +6,7 @@ import '../../models/device_model.dart';
 import '../../models/location_model.dart';
 import '../../services/device_service.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/play_sound_dialog.dart';
 
 class DeviceDetailsScreen extends StatefulWidget {
   final DeviceModel? initialDevice;
@@ -50,9 +51,38 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
         freshLoc = await _deviceService.getDeviceLocation(id);
       } catch (_) {}
 
+      bool isLost = freshDevice.isLost;
+      String? lostPhone = freshDevice.lostPhoneNumber;
+      String? lostMsg = freshDevice.lostMessage;
+
+      try {
+        final lostMode = await _deviceService.getLostMode(id);
+        isLost = isLost || lostMode.isLost;
+        if (lostMode.phoneNumber != null && lostMode.phoneNumber!.isNotEmpty) {
+          lostPhone = lostMode.phoneNumber;
+        }
+        if (lostMode.message != null && lostMode.message!.isNotEmpty) {
+          lostMsg = lostMode.message;
+        }
+      } catch (_) {}
+
+      if (widget.initialDevice?.isLost == true) {
+        isLost = true;
+        if (lostPhone == null || lostPhone.isEmpty) {
+          lostPhone = widget.initialDevice?.lostPhoneNumber;
+        }
+        if (lostMsg == null || lostMsg.isEmpty) {
+          lostMsg = widget.initialDevice?.lostMessage;
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _device = freshDevice;
+        _device = freshDevice.copyWith(
+          isLost: isLost,
+          lostPhoneNumber: lostPhone,
+          lostMessage: lostMsg,
+        );
         _location = freshLoc;
         _isLoading = false;
       });
@@ -165,6 +195,46 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Lost Mode Warning Banner
+                        if (device.isLost) ...[
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.warning),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 24),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'LOST MODE IS ACTIVE',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: AppColors.warning,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Screen is locked. Contact: ${device.lostPhoneNumber ?? "Configured"}',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+
                         // Header Device Card
                         _buildHeaderCard(device),
                         const SizedBox(height: 16),
@@ -222,11 +292,10 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                           subtitle: 'Ring device at maximum volume to locate nearby',
                           color: AppColors.secondary,
                           onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Ringing ${device.name}... (Ready in Phase 10)'),
-                                duration: const Duration(seconds: 2),
-                              ),
+                            PlaySoundDialog.show(
+                              context,
+                              deviceId: device.id,
+                              deviceName: device.name,
                             );
                           },
                         ),
@@ -235,13 +304,13 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                           title: 'Lost Mode',
                           subtitle: 'Lock screen and display return contact info',
                           color: AppColors.warning,
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Lost mode toggle for ${device.name} (Ready in Phase 10)'),
-                                duration: const Duration(seconds: 2),
-                              ),
+                          onTap: () async {
+                            await Navigator.pushNamed(
+                              context,
+                              AppRoutes.lostMode,
+                              arguments: device,
                             );
+                            _loadDeviceAndLocation();
                           },
                         ),
                         const SizedBox(height: 24),

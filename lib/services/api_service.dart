@@ -52,10 +52,22 @@ class ApiService {
     ],
   };
 
+  final Map<int, Map<String, dynamic>> _mockLostModes = {
+    101: {
+      'device_id': 101,
+      'is_lost': false,
+      'phone_number': '9876543210',
+      'message': 'This phone is lost. Please contact the owner immediately.',
+      'updated_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+    },
+  };
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
+
   /// Performs GET request with automatic Bearer token injection
   Future<dynamic> get(String endpoint, {Map<String, String>? headers}) async {
     if (isMock) {
-      await Future.delayed(const Duration(milliseconds: 200));
+      if (!_isTest) await Future.delayed(const Duration(milliseconds: 200));
       return _handleMockGet(endpoint);
     }
 
@@ -86,7 +98,7 @@ class ApiService {
     Map<String, String>? headers,
   }) async {
     if (isMock) {
-      await Future.delayed(const Duration(milliseconds: 250));
+      if (!_isTest) await Future.delayed(const Duration(milliseconds: 250));
       return _handleMockPost(endpoint, data);
     }
 
@@ -117,7 +129,7 @@ class ApiService {
   /// Performs DELETE request with automatic Bearer token injection
   Future<dynamic> delete(String endpoint, {Map<String, String>? headers}) async {
     if (isMock) {
-      await Future.delayed(const Duration(milliseconds: 200));
+      if (!_isTest) await Future.delayed(const Duration(milliseconds: 200));
       return {'success': true};
     }
 
@@ -235,6 +247,20 @@ class ApiService {
       };
     }
 
+    // Match GET /devices/{id}/lost-mode/
+    final lostModeRegex = RegExp(r'^devices/(\d+)/lost-mode/?$');
+    final matchLostMode = lostModeRegex.firstMatch(endpoint);
+    if (matchLostMode != null) {
+      final deviceId = int.parse(matchLostMode.group(1)!);
+      return _mockLostModes[deviceId] ?? {
+        'device_id': deviceId,
+        'is_lost': false,
+        'phone_number': '',
+        'message': '',
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+    }
+
     return {};
   }
 
@@ -274,6 +300,61 @@ class ApiService {
           'name': name,
           'email': email,
         },
+      };
+    }
+
+    // Match POST /devices/{id}/play-sound/
+    final playSoundRegex = RegExp(r'^devices/(\d+)/play-sound/?$');
+    final matchPlaySound = playSoundRegex.firstMatch(endpoint);
+    if (matchPlaySound != null) {
+      final deviceId = int.parse(matchPlaySound.group(1)!);
+      return {
+        'status': 'playing',
+        'device_id': deviceId,
+        'message': 'Sound command dispatched at maximum volume',
+      };
+    }
+
+    // Match POST /devices/{id}/stop-sound/
+    final stopSoundRegex = RegExp(r'^devices/(\d+)/stop-sound/?$');
+    final matchStopSound = stopSoundRegex.firstMatch(endpoint);
+    if (matchStopSound != null) {
+      final deviceId = int.parse(matchStopSound.group(1)!);
+      return {
+        'status': 'stopped',
+        'device_id': deviceId,
+      };
+    }
+
+    // Match POST /devices/{id}/lost-mode/
+    final lostModePostRegex = RegExp(r'^devices/(\d+)/lost-mode/?$');
+    final matchLostModePost = lostModePostRegex.firstMatch(endpoint);
+    if (matchLostModePost != null) {
+      final deviceId = int.parse(matchLostModePost.group(1)!);
+      final isLost = data?['is_lost'] as bool? ?? true;
+      final phone = data?['phone_number'] as String?;
+      final msg = data?['message'] as String?;
+
+      final updated = {
+        'device_id': deviceId,
+        'is_lost': isLost,
+        'phone_number': phone ?? '',
+        'message': msg ?? '',
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      _mockLostModes[deviceId] = updated;
+      return updated;
+    }
+
+    // Match POST /devices/{id}/lock/
+    final lockRegex = RegExp(r'^devices/(\d+)/lock/?$');
+    final matchLock = lockRegex.firstMatch(endpoint);
+    if (matchLock != null) {
+      final deviceId = int.parse(matchLock.group(1)!);
+      return {
+        'status': 'locked',
+        'device_id': deviceId,
+        'message': data?['lock_message'] ?? 'Device locked remotely',
       };
     }
 

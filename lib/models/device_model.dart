@@ -5,6 +5,9 @@ class DeviceModel {
   final bool isOnline;
   final int batteryLevel;
   final DateTime? lastSeen;
+  final bool isLost;
+  final String? lostPhoneNumber;
+  final String? lostMessage;
 
   const DeviceModel({
     required this.id,
@@ -13,6 +16,9 @@ class DeviceModel {
     required this.isOnline,
     required this.batteryLevel,
     this.lastSeen,
+    this.isLost = false,
+    this.lostPhoneNumber,
+    this.lostMessage,
   });
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
@@ -25,6 +31,33 @@ class DeviceModel {
       lastSeen: json['last_seen'] != null
           ? DateTime.tryParse(json['last_seen'] as String)
           : null,
+      isLost: json['is_lost'] as bool? ?? false,
+      lostPhoneNumber: json['phone_number'] as String? ?? json['lost_phone_number'] as String?,
+      lostMessage: json['message'] as String? ?? json['lost_message'] as String?,
+    );
+  }
+
+  DeviceModel copyWith({
+    int? id,
+    String? name,
+    String? deviceType,
+    bool? isOnline,
+    int? batteryLevel,
+    DateTime? lastSeen,
+    bool? isLost,
+    String? lostPhoneNumber,
+    String? lostMessage,
+  }) {
+    return DeviceModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      deviceType: deviceType ?? this.deviceType,
+      isOnline: isOnline ?? this.isOnline,
+      batteryLevel: batteryLevel ?? this.batteryLevel,
+      lastSeen: lastSeen ?? this.lastSeen,
+      isLost: isLost ?? this.isLost,
+      lostPhoneNumber: lostPhoneNumber ?? this.lostPhoneNumber,
+      lostMessage: lostMessage ?? this.lostMessage,
     );
   }
 
@@ -36,6 +69,9 @@ class DeviceModel {
       'is_online': isOnline,
       'battery_level': batteryLevel,
       'last_seen': lastSeen?.toIso8601String(),
+      'is_lost': isLost,
+      if (lostPhoneNumber != null) 'phone_number': lostPhoneNumber,
+      if (lostMessage != null) 'message': lostMessage,
     };
   }
 

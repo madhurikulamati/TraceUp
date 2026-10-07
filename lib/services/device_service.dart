@@ -1,5 +1,6 @@
 import '../models/device_model.dart';
 import '../models/location_model.dart';
+import '../models/lost_mode_model.dart';
 import '../core/constants/api_constants.dart';
 import '../core/utils/api_exception.dart';
 import 'api_service.dart';
@@ -204,5 +205,118 @@ class DeviceService {
     await sendDeviceLocation(deviceId: deviceId, location: liveLocation);
 
     return liveLocation;
+  }
+
+  /// Triggers sound alert on device: POST /devices/{id}/play-sound/
+  Future<Map<String, dynamic>> playSound(int deviceId) async {
+    try {
+      final response = await _apiService.post(
+        ApiConstants.playSoundEndpoint(deviceId),
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return {'status': 'playing'};
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Cancels remote sound alert on device: POST /devices/{id}/stop-sound/
+  Future<Map<String, dynamic>> stopSound(int deviceId) async {
+    try {
+      final response = await _apiService.post(
+        ApiConstants.stopSoundEndpoint(deviceId),
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return {'status': 'stopped'};
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Retrieves current Lost Mode status: GET /devices/{id}/lost-mode/
+  Future<LostModeModel> getLostMode(int deviceId) async {
+    try {
+      final response = await _apiService.get(
+        ApiConstants.lostModeEndpoint(deviceId),
+      );
+
+      if (response is Map<String, dynamic>) {
+        return LostModeModel.fromJson(response);
+      }
+      throw ApiException.invalidResponse();
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Configures or toggles Lost Mode: POST /devices/{id}/lost-mode/
+  Future<LostModeModel> setLostMode(
+    int deviceId, {
+    required bool isLost,
+    String? phoneNumber,
+    String? message,
+  }) async {
+    try {
+      final response = await _apiService.post(
+        ApiConstants.lostModeEndpoint(deviceId),
+        data: {
+          'is_lost': isLost,
+          'phone_number': ?phoneNumber,
+          'message': ?message,
+        },
+      );
+
+      if (response is Map<String, dynamic>) {
+        // Also update local mock device if exists
+        final index = _mockDevices.indexWhere((d) => d.id == deviceId);
+        if (index != -1) {
+          _mockDevices[index] = _mockDevices[index].copyWith(
+            isLost: isLost,
+            lostPhoneNumber: phoneNumber,
+            lostMessage: message,
+          );
+        }
+
+        return LostModeModel.fromJson(response);
+      }
+      throw ApiException.invalidResponse();
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Remotely locks device screen: POST /devices/{id}/lock/
+  Future<Map<String, dynamic>> lockDevice(int deviceId, {String? lockMessage}) async {
+    try {
+      final response = await _apiService.post(
+        ApiConstants.lockDeviceEndpoint(deviceId),
+        data: {
+          'lock_message': ?lockMessage,
+        },
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return {'status': 'locked'};
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
   }
 }

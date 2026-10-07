@@ -27,4 +27,10 @@ class ApiConstants {
   static const String baseWsUrl = 'ws://10.0.2.2:8000/ws/';
   static String deviceWsEndpoint(int deviceId) => 'devices/$deviceId/';
   static Uri deviceWsUri(int deviceId) => Uri.parse('$baseWsUrl${deviceWsEndpoint(deviceId)}');
+
+  // Feature & Control endpoints (Phase 10)
+  static String playSoundEndpoint(int id) => 'devices/$id/play-sound/';
+  static String stopSoundEndpoint(int id) => 'devices/$id/stop-sound/';
+  static String lostModeEndpoint(int id) => 'devices/$id/lost-mode/';
+  static String lockDeviceEndpoint(int id) => 'devices/$id/lock/';
 }
