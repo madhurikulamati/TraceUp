@@ -19,6 +19,7 @@ class TraceUpApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       initialRoute: AppRoutes.splash,
       routes: AppRoutes.routes,
+      onGenerateRoute: AppRoutes.onGenerateRoute,
     );
   }
 }

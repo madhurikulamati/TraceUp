@@ -1,19 +1,47 @@
 import 'package:flutter/material.dart';
+import '../../models/device_model.dart';
 import '../../screens/splash/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/register_screen.dart';
 import '../../screens/home/home_screen.dart';
+import '../../screens/devices/device_list_screen.dart';
+import '../../screens/devices/device_details_screen.dart';
+import '../../screens/devices/add_device_screen.dart';
 
 class AppRoutes {
   static const String splash = '/splash';
   static const String login = '/login';
   static const String register = '/register';
   static const String home = '/home';
+  static const String deviceList = '/devices';
+  static const String addDevice = '/devices/add';
+  static const String deviceDetails = '/devices/details';
 
   static Map<String, WidgetBuilder> get routes => {
         splash: (context) => const SplashScreen(),
         login: (context) => const LoginScreen(),
         register: (context) => const RegisterScreen(),
         home: (context) => const HomeScreen(),
+        deviceList: (context) => const DeviceListScreen(),
+        addDevice: (context) => const AddDeviceScreen(),
       };
+
+  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    if (settings.name == deviceDetails) {
+      final args = settings.arguments;
+      if (args is DeviceModel) {
+        return MaterialPageRoute(
+          builder: (context) => DeviceDetailsScreen(initialDevice: args),
+        );
+      } else if (args is int) {
+        return MaterialPageRoute(
+          builder: (context) => DeviceDetailsScreen(deviceId: args),
+        );
+      }
+      return MaterialPageRoute(
+        builder: (context) => const DeviceDetailsScreen(),
+      );
+    }
+    return null;
+  }
 }

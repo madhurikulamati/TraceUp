@@ -105,6 +105,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        tooltip: 'Add Device',
+        child: const Icon(Icons.add_rounded),
+        onPressed: () async {
+          final added = await Navigator.pushNamed(context, AppRoutes.addDevice);
+          if (added == true) {
+            _loadDashboardData();
+          }
+        },
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadDashboardData,
@@ -239,17 +251,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    Text(
-                      '${_devices.where((d) => d.isOnline).length} Online',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.online,
+                    TextButton(
+                      onPressed: () async {
+                        await Navigator.pushNamed(context, AppRoutes.deviceList);
+                        _loadDashboardData();
+                      },
+                      child: const Text(
+                        'View All',
+                        style: TextStyle(
+                          color: AppColors.primaryLight,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
 
                 // Device List
                 if (_isLoading)
@@ -288,89 +306,91 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildDeviceCard(DeviceModel device) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    device.deviceType.toLowerCase() == 'android'
-                        ? Icons.phone_android_rounded
-                        : Icons.devices_rounded,
-                    color: AppColors.primary,
-                    size: 26,
-                  ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () async {
+          final shouldRefresh = await Navigator.pushNamed(
+            context,
+            AppRoutes.deviceDetails,
+            arguments: device,
+          );
+          if (shouldRefresh == true) {
+            _loadDashboardData();
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        device.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                child: Icon(
+                  device.deviceType.toLowerCase() == 'android'
+                      ? Icons.phone_android_rounded
+                      : Icons.devices_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      device.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: device.isOnline ? AppColors.online : AppColors.offline,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: device.isOnline ? AppColors.online : AppColors.offline,
-                            ),
+                        const SizedBox(width: 6),
+                        Text(
+                          device.isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: device.isOnline ? AppColors.online : AppColors.offline,
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            device.isOnline ? 'Online' : 'Offline',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: device.isOnline ? AppColors.online : AppColors.offline,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          device.isLowBattery ? Icons.battery_alert_rounded : Icons.battery_std_rounded,
+                          size: 14,
+                          color: device.isLowBattery ? AppColors.error : AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${device.batteryLevel}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: device.isLowBattery ? AppColors.error : AppColors.textSecondary,
                           ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.battery_std_rounded, size: 14, color: AppColors.textSecondary),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${device.batteryLevel}%',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textLight),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Selected: ${device.name} (Details ready for Phase 3)'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textLight),
+            ],
+          ),
         ),
       ),
     );
