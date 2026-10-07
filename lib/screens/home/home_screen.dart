@@ -30,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadDashboardData() async {
     setState(() => _isLoading = true);
     try {
+      await _authService.getCurrentUser();
       final devices = await _deviceService.getDevices();
       if (!mounted) return;
       setState(() {

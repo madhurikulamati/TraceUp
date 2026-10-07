@@ -1,7 +1,8 @@
+import '../core/constants/api_constants.dart';
+import '../core/utils/api_exception.dart';
 import '../models/user_model.dart';
 import '../storage/token_storage.dart';
 import 'api_service.dart';
-import '../core/constants/api_constants.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -14,72 +15,132 @@ class AuthService {
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
 
+  /// Checks whether a valid session token exists
   Future<bool> isLoggedIn() async {
     return await _tokenStorage.hasToken();
   }
 
+  /// Authenticates user and securely stores JWT tokens
   Future<UserModel> login({
     required String email,
     required String password,
   }) async {
-    final response = await _apiService.post(
-      ApiConstants.loginEndpoint,
-      data: {
-        'email': email,
-        'password': password,
-      },
-    );
+    try {
+      final response = await _apiService.post(
+        ApiConstants.loginEndpoint,
+        data: {
+          'email': email.trim(),
+          'password': password,
+        },
+      );
 
-    final accessToken = response['access'] as String? ?? '';
-    final refreshToken = response['refresh'] as String? ?? '';
-    await _tokenStorage.saveTokens(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-    );
+      if (response is! Map<String, dynamic>) {
+        throw ApiException.invalidResponse();
+      }
 
-    final userJson = response['user'] as Map<String, dynamic>;
-    _currentUser = UserModel.fromJson(userJson);
-    return _currentUser!;
+      final accessToken = response['access'] as String?;
+      final refreshToken = response['refresh'] as String?;
+
+      if (accessToken == null || accessToken.isEmpty) {
+        throw ApiException.invalidResponse();
+      }
+
+      await _tokenStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken ?? '',
+      );
+
+      final userJson = response['user'] as Map<String, dynamic>?;
+      if (userJson != null) {
+        _currentUser = UserModel.fromJson(userJson);
+        await _tokenStorage.saveUser(_currentUser!);
+      }
+
+      return _currentUser ??
+          UserModel(id: 1, name: email.split('@').first, email: email);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
   }
 
+  /// Registers a new user and stores authentication tokens
   Future<UserModel> register({
     required String name,
     required String email,
     required String password,
   }) async {
-    final response = await _apiService.post(
-      ApiConstants.registerEndpoint,
-      data: {
-        'name': name,
-        'email': email,
-        'password': password,
-      },
-    );
+    try {
+      final response = await _apiService.post(
+        ApiConstants.registerEndpoint,
+        data: {
+          'name': name.trim(),
+          'email': email.trim(),
+          'password': password,
+        },
+      );
 
-    final accessToken = response['access'] as String? ?? '';
-    final refreshToken = response['refresh'] as String? ?? '';
-    await _tokenStorage.saveTokens(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-    );
+      if (response is! Map<String, dynamic>) {
+        throw ApiException.invalidResponse();
+      }
 
-    final userJson = response['user'] as Map<String, dynamic>;
-    _currentUser = UserModel.fromJson(userJson);
-    return _currentUser!;
+      final accessToken = response['access'] as String?;
+      final refreshToken = response['refresh'] as String?;
+
+      if (accessToken != null && accessToken.isNotEmpty) {
+        await _tokenStorage.saveTokens(
+          accessToken: accessToken,
+          refreshToken: refreshToken ?? '',
+        );
+      }
+
+      final userJson = response['user'] as Map<String, dynamic>?;
+      if (userJson != null) {
+        _currentUser = UserModel.fromJson(userJson);
+        await _tokenStorage.saveUser(_currentUser!);
+      }
+
+      return _currentUser ?? UserModel(id: 2, name: name, email: email);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
   }
 
+  /// Terminates user session and removes all stored tokens securely
   Future<void> logout() async {
-    await _tokenStorage.clearTokens();
+    await _tokenStorage.clearAll();
     _currentUser = null;
   }
 
+  /// Retrieves the current authenticated user (from cache, storage, or /auth/me/)
   Future<UserModel?> getCurrentUser() async {
     if (_currentUser != null) return _currentUser;
-    final token = await _tokenStorage.getAccessToken();
-    if (token == null) return null;
 
-    final response = await _apiService.get(ApiConstants.meEndpoint);
-    _currentUser = UserModel.fromJson(response);
-    return _currentUser;
+    // Check secure token
+    final token = await _tokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) return null;
+
+    // Check locally stored user info first
+    final storedUser = await _tokenStorage.getUser();
+    if (storedUser != null) {
+      _currentUser = storedUser;
+      return _currentUser;
+    }
+
+    try {
+      final response = await _apiService.get(ApiConstants.meEndpoint);
+      if (response is Map<String, dynamic>) {
+        _currentUser = UserModel.fromJson(response);
+        await _tokenStorage.saveUser(_currentUser!);
+        return _currentUser;
+      }
+    } catch (_) {
+      // In case network fails but token exists
+    }
+
+    return null;
   }
 }

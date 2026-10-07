@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:traceup/core/utils/api_exception.dart';
 import 'package:traceup/models/user_model.dart';
 import 'package:traceup/models/device_model.dart';
 import 'package:traceup/services/auth_service.dart';
 import 'package:traceup/services/device_service.dart';
+import 'package:traceup/storage/token_storage.dart';
 
 void main() {
   group('Model Serialization Tests', () {
@@ -42,28 +44,121 @@ void main() {
     });
   });
 
-  group('Service Mock Tests', () {
-    test('AuthService login, register, and logout workflow', () async {
-      final authService = AuthService();
+  group('ApiException Tests (Section 18)', () {
+    test('ApiException returns friendly message for 401 Unauthorized', () {
+      final exception = ApiException.fromStatusCode(401);
+      expect(exception.message, contains('Invalid email or password'));
+      expect(exception.statusCode, 401);
+    });
 
-      // Ensure logged out initially
+    test('ApiException returns friendly message for 403 Forbidden', () {
+      final exception = ApiException.fromStatusCode(403);
+      expect(exception.message, contains('permission'));
+      expect(exception.statusCode, 403);
+    });
+
+    test('ApiException returns friendly message for 404 Not Found', () {
+      final exception = ApiException.fromStatusCode(404);
+      expect(exception.message, contains('not found'));
+      expect(exception.statusCode, 404);
+    });
+
+    test('ApiException returns friendly message for 500 Server Error', () {
+      final exception = ApiException.fromStatusCode(500);
+      expect(exception.message, contains('Server error'));
+      expect(exception.statusCode, 500);
+    });
+
+    test('ApiException handles No Internet and Timeout scenarios', () {
+      final noInternet = ApiException.noInternet();
+      expect(noInternet.message, contains('No internet connection'));
+      expect(noInternet.type, ApiExceptionType.noInternet);
+
+      final timeout = ApiException.timeout();
+      expect(timeout.message, contains('timed out'));
+      expect(timeout.type, ApiExceptionType.timeout);
+    });
+  });
+
+  group('TokenStorage Tests (Section 19)', () {
+    test('TokenStorage correctly saves, retrieves, and clears JWT tokens', () async {
+      final storage = TokenStorage();
+      await storage.clearAll();
+
+      expect(await storage.hasToken(), false);
+
+      await storage.saveTokens(
+        accessToken: 'test_access_token_123',
+        refreshToken: 'test_refresh_token_456',
+      );
+
+      expect(await storage.hasToken(), true);
+      expect(await storage.getAccessToken(), 'test_access_token_123');
+      expect(await storage.getRefreshToken(), 'test_refresh_token_456');
+
+      await storage.clearAll();
+      expect(await storage.hasToken(), false);
+      expect(await storage.getAccessToken(), isNull);
+    });
+  });
+
+  group('AuthService Tests (Section 9)', () {
+    final authService = AuthService();
+
+    setUp(() async {
       await authService.logout();
-      expect(await authService.isLoggedIn(), false);
+    });
 
-      // Perform login
+    test('Successful login sets tokens and returns user model', () async {
       final user = await authService.login(
         email: 'user@example.com',
         password: 'password123',
       );
+
       expect(user.email, 'user@example.com');
       expect(await authService.isLoggedIn(), true);
+      expect(authService.currentUser?.email, 'user@example.com');
+    });
 
-      // Perform logout
+    test('Failed login with invalid credentials throws ApiException with 401', () async {
+      expect(
+        () => authService.login(
+          email: 'user@example.com',
+          password: 'wrongpassword',
+        ),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)),
+      );
+    });
+
+    test('Registration sets tokens and retrieves current user', () async {
+      final user = await authService.register(
+        name: 'New Registered User',
+        email: 'newuser@example.com',
+        password: 'password123',
+      );
+
+      expect(user.name, 'New Registered User');
+      expect(user.email, 'newuser@example.com');
+      expect(await authService.isLoggedIn(), true);
+
+      final fetchedUser = await authService.getCurrentUser();
+      expect(fetchedUser?.email, 'newuser@example.com');
+    });
+
+    test('Logout clears all tokens and session state', () async {
+      await authService.login(
+        email: 'user@example.com',
+        password: 'password123',
+      );
+      expect(await authService.isLoggedIn(), true);
+
       await authService.logout();
       expect(await authService.isLoggedIn(), false);
       expect(authService.currentUser, isNull);
     });
+  });
 
+  group('DeviceService Tests', () {
     test('DeviceService retrieves and modifies mock devices', () async {
       final deviceService = DeviceService();
 

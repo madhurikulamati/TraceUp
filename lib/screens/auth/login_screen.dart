@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/utils/api_exception.dart';
 import '../../core/utils/app_routes.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
@@ -44,7 +45,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRoutes.home);
-    } catch (e) {
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message;
+      });
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Login failed. Please check your credentials and try again.';

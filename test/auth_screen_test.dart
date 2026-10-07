@@ -26,6 +26,23 @@ void main() {
     expect(find.text('Email is required'), findsOneWidget);
   });
 
+  testWidgets('LoginScreen shows error message banner when authentication fails', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const LoginScreen(),
+      ),
+    );
+
+    // Enter wrong password
+    await tester.enterText(find.byType(TextFormField).last, 'wrongpassword');
+    await tester.tap(find.text('Sign In'));
+    await tester.pumpAndSettle();
+
+    // Verify error banner is rendered with user-friendly message
+    expect(find.text('Invalid email or password. Please try again.'), findsOneWidget);
+  });
+
   testWidgets('RegisterScreen renders full registration form', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(

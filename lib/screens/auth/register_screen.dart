@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/utils/api_exception.dart';
 import '../../core/utils/app_routes.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
@@ -54,7 +55,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
       Navigator.pushReplacementNamed(context, AppRoutes.home);
-    } catch (e) {
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message;
+      });
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Registration failed. Please check details and try again.';
