@@ -94,6 +94,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Device GPS',
+            icon: const Icon(Icons.gps_fixed_rounded),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.location),
+          ),
+          IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadDashboardData,

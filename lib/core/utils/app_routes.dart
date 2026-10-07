@@ -7,6 +7,7 @@ import '../../screens/home/home_screen.dart';
 import '../../screens/devices/device_list_screen.dart';
 import '../../screens/devices/device_details_screen.dart';
 import '../../screens/devices/add_device_screen.dart';
+import '../../screens/location/location_status_screen.dart';
 
 class AppRoutes {
   static const String splash = '/splash';
@@ -16,6 +17,7 @@ class AppRoutes {
   static const String deviceList = '/devices';
   static const String addDevice = '/devices/add';
   static const String deviceDetails = '/devices/details';
+  static const String location = '/location';
 
   static Map<String, WidgetBuilder> get routes => {
         splash: (context) => const SplashScreen(),
@@ -24,6 +26,7 @@ class AppRoutes {
         home: (context) => const HomeScreen(),
         deviceList: (context) => const DeviceListScreen(),
         addDevice: (context) => const AddDeviceScreen(),
+        location: (context) => const LocationStatusScreen(),
       };
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {

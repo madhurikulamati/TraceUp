@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_routes.dart';
 import '../../models/device_model.dart';
 import '../../services/device_service.dart';
 
@@ -139,12 +140,7 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                           subtitle: 'View live GPS position on interactive map',
                           color: AppColors.primary,
                           onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Live map tracking for ${device.name} (Ready in Phase 6)'),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                            Navigator.pushNamed(context, AppRoutes.location);
                           },
                         ),
                         _buildActionTile(
