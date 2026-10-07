@@ -1,7 +1,9 @@
 import '../models/device_model.dart';
+import '../models/location_model.dart';
 import '../core/constants/api_constants.dart';
 import '../core/utils/api_exception.dart';
 import 'api_service.dart';
+import 'location_service.dart';
 
 class DeviceService {
   static final DeviceService _instance = DeviceService._internal();
@@ -125,5 +127,82 @@ class DeviceService {
     } catch (_) {
       throw ApiException.invalidResponse();
     }
+  }
+
+  // --- Phase 5 Location API Methods ---
+
+  /// Sends dynamic GPS location to the backend: POST /devices/{id}/location/
+  Future<Map<String, dynamic>> sendDeviceLocation({
+    required int deviceId,
+    required LocationModel location,
+  }) async {
+    try {
+      final response = await _apiService.post(
+        ApiConstants.deviceLocationEndpoint(deviceId),
+        data: location.toPostPayload(),
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      throw ApiException.invalidResponse();
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Retrieves the latest recorded location for a device: GET /devices/{id}/location/
+  Future<LocationModel> getDeviceLocation(int deviceId) async {
+    try {
+      final response = await _apiService.get(
+        ApiConstants.deviceLocationEndpoint(deviceId),
+      );
+
+      if (response is Map<String, dynamic>) {
+        return LocationModel.fromJson(response);
+      }
+      throw ApiException.invalidResponse();
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Retrieves historic location updates for a device: GET /devices/{id}/locations/
+  Future<List<LocationModel>> getDeviceLocationHistory(int deviceId) async {
+    try {
+      final response = await _apiService.get(
+        ApiConstants.deviceLocationsEndpoint(deviceId),
+      );
+
+      if (response is List) {
+        return response
+            .map((item) => LocationModel.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException.invalidResponse();
+    }
+  }
+
+  /// Obtains live GPS coordinates from LocationService and uploads them to the server
+  Future<LocationModel> syncCurrentLocationToServer({
+    required int deviceId,
+    LocationService? locationService,
+  }) async {
+    final service = locationService ?? LocationService();
+    // 1. Obtain dynamic coordinates from GPS sensor (not hard-coded)
+    final liveLocation = await service.getCurrentLocation();
+
+    // 2. Transmit to backend via POST /devices/{id}/location/
+    await sendDeviceLocation(deviceId: deviceId, location: liveLocation);
+
+    return liveLocation;
   }
 }

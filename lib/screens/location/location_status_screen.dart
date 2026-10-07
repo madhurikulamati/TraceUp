@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/api_exception.dart';
 import '../../models/location_model.dart';
 import '../../services/location_service.dart';
+import '../../services/device_service.dart';
 import '../../widgets/custom_button.dart';
 
 class LocationStatusScreen extends StatefulWidget {
@@ -14,15 +15,51 @@ class LocationStatusScreen extends StatefulWidget {
 
 class _LocationStatusScreenState extends State<LocationStatusScreen> {
   final LocationService _locationService = LocationService();
+  final DeviceService _deviceService = DeviceService();
 
   LocationModel? _currentLocation;
   bool _isLoading = false;
+  bool _isSendingToServer = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _fetchLocation();
+  }
+
+  Future<void> _sendLocationToServer() async {
+    if (_currentLocation == null) return;
+
+    setState(() => _isSendingToServer = true);
+    try {
+      final devices = await _deviceService.getDevices();
+      final targetDeviceId = devices.isNotEmpty ? devices.first.id : 101;
+
+      await _deviceService.sendDeviceLocation(
+        deviceId: targetDeviceId,
+        location: _currentLocation!,
+      );
+
+      if (!mounted) return;
+      setState(() => _isSendingToServer = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Position sent to server for device #$targetDeviceId successfully!'),
+          backgroundColor: AppColors.online,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSendingToServer = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to transmit location to server.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _fetchLocation() async {
@@ -253,6 +290,14 @@ class _LocationStatusScreenState extends State<LocationStatusScreen> {
                 isLoading: _isLoading,
                 icon: Icons.my_location_rounded,
                 onPressed: _fetchLocation,
+              ),
+              const SizedBox(height: 12),
+              CustomButton(
+                text: 'Upload Position to Server',
+                isLoading: _isSendingToServer,
+                isOutlined: true,
+                icon: Icons.cloud_upload_outlined,
+                onPressed: _currentLocation == null ? null : _sendLocationToServer,
               ),
             ],
           ),

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/api_exception.dart';
 import '../../core/utils/app_routes.dart';
 import '../../models/device_model.dart';
+import '../../models/location_model.dart';
 import '../../services/device_service.dart';
+import '../../widgets/custom_button.dart';
 
 class DeviceDetailsScreen extends StatefulWidget {
   final DeviceModel? initialDevice;
@@ -22,7 +25,9 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
   final DeviceService _deviceService = DeviceService();
 
   DeviceModel? _device;
+  LocationModel? _location;
   bool _isLoading = true;
+  bool _isSyncingLocation = false;
 
   @override
   void initState() {
@@ -31,23 +36,69 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
     if (_device != null) {
       _isLoading = false;
     }
-    _loadDevice();
+    _loadDeviceAndLocation();
   }
 
-  Future<void> _loadDevice() async {
+  Future<void> _loadDeviceAndLocation() async {
     final id = widget.deviceId ?? widget.initialDevice?.id;
     if (id == null) return;
 
     try {
       final freshDevice = await _deviceService.getDeviceById(id);
+      LocationModel? freshLoc;
+      try {
+        freshLoc = await _deviceService.getDeviceLocation(id);
+      } catch (_) {}
+
       if (!mounted) return;
       setState(() {
         _device = freshDevice;
+        _location = freshLoc;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleSyncLocation() async {
+    final id = _device?.id ?? widget.deviceId ?? widget.initialDevice?.id;
+    if (id == null) return;
+
+    setState(() => _isSyncingLocation = true);
+
+    try {
+      final updatedLocation = await _deviceService.syncCurrentLocationToServer(deviceId: id);
+      if (!mounted) return;
+      setState(() {
+        _location = updatedLocation;
+        _isSyncingLocation = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'GPS coordinates uploaded to server: (${updatedLocation.latitude.toStringAsFixed(4)}, ${updatedLocation.longitude.toStringAsFixed(4)})',
+          ),
+          backgroundColor: AppColors.online,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSyncingLocation = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: AppColors.error),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSyncingLocation = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to transmit location to server.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -98,7 +149,7 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadDevice,
+            onPressed: _loadDeviceAndLocation,
           ),
         ],
       ),
@@ -107,7 +158,7 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
           : device == null
               ? const Center(child: Text('Device not found'))
               : RefreshIndicator(
-                  onRefresh: _loadDevice,
+                  onRefresh: _loadDeviceAndLocation,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16.0),
@@ -122,9 +173,13 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                         _buildBatteryCard(device),
                         const SizedBox(height: 12),
                         _buildStatusCard(device),
+                        const SizedBox(height: 12),
+
+                        // Location Card (Phase 5)
+                        _buildLocationCard(_location),
                         const SizedBox(height: 20),
 
-                        // Device Actions Section
+                        // Device Operations Section
                         const Text(
                           'Device Operations',
                           style: TextStyle(
@@ -364,6 +419,79 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                 device.lastSeen!.toLocal().toString().split('.').first,
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationCard(LocationModel? location) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, color: AppColors.primary, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Recorded GPS Location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (location != null ? AppColors.online : AppColors.offline).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    location != null ? 'Synced' : 'No Data',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: location != null ? AppColors.online : AppColors.offline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (location != null) ...[
+              _buildDetailRow('Latitude', '${location.latitude.toStringAsFixed(6)}°'),
+              const Divider(color: AppColors.border, height: 16),
+              _buildDetailRow('Longitude', '${location.longitude.toStringAsFixed(6)}°'),
+              const Divider(color: AppColors.border, height: 16),
+              _buildDetailRow('Accuracy', '±${location.accuracy.toStringAsFixed(1)} m'),
+              const Divider(color: AppColors.border, height: 16),
+              _buildDetailRow(
+                'Last Reported',
+                location.timestamp.toLocal().toString().split('.').first,
+              ),
+            ] else ...[
+              const Text(
+                'No GPS coordinates reported yet for this device.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+            const SizedBox(height: 16),
+            CustomButton(
+              text: 'Transmit Current Location to Server',
+              icon: Icons.send_rounded,
+              isLoading: _isSyncingLocation,
+              isOutlined: true,
+              onPressed: _handleSyncLocation,
+            ),
           ],
         ),
       ),

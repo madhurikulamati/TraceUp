@@ -22,10 +22,40 @@ class ApiService {
 
   static const Duration timeoutDuration = Duration(seconds: 15);
 
+  // In-memory mock store for locations
+  final Map<int, Map<String, dynamic>> _mockDeviceLocations = {
+    101: {
+      'device_id': 101,
+      'latitude': 16.2356,
+      'longitude': 80.0498,
+      'accuracy': 10.5,
+      'timestamp': DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
+    },
+  };
+
+  final Map<int, List<Map<String, dynamic>>> _mockLocationHistories = {
+    101: [
+      {
+        'device_id': 101,
+        'latitude': 16.2350,
+        'longitude': 80.0490,
+        'accuracy': 12.0,
+        'timestamp': DateTime.now().subtract(const Duration(hours: 1)).toIso8601String(),
+      },
+      {
+        'device_id': 101,
+        'latitude': 16.2356,
+        'longitude': 80.0498,
+        'accuracy': 10.5,
+        'timestamp': DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
+      },
+    ],
+  };
+
   /// Performs GET request with automatic Bearer token injection
   Future<dynamic> get(String endpoint, {Map<String, String>? headers}) async {
     if (isMock) {
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 200));
       return _handleMockGet(endpoint);
     }
 
@@ -56,7 +86,7 @@ class ApiService {
     Map<String, String>? headers,
   }) async {
     if (isMock) {
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 250));
       return _handleMockPost(endpoint, data);
     }
 
@@ -87,7 +117,7 @@ class ApiService {
   /// Performs DELETE request with automatic Bearer token injection
   Future<dynamic> delete(String endpoint, {Map<String, String>? headers}) async {
     if (isMock) {
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 200));
       return {'success': true};
     }
 
@@ -182,6 +212,29 @@ class ApiService {
         }
       ];
     }
+
+    // Match GET /devices/{id}/locations/
+    final locationsRegex = RegExp(r'^devices/(\d+)/locations/?$');
+    final matchLocations = locationsRegex.firstMatch(endpoint);
+    if (matchLocations != null) {
+      final deviceId = int.parse(matchLocations.group(1)!);
+      return _mockLocationHistories[deviceId] ?? [];
+    }
+
+    // Match GET /devices/{id}/location/
+    final locationRegex = RegExp(r'^devices/(\d+)/location/?$');
+    final matchLocation = locationRegex.firstMatch(endpoint);
+    if (matchLocation != null) {
+      final deviceId = int.parse(matchLocation.group(1)!);
+      return _mockDeviceLocations[deviceId] ?? {
+        'device_id': deviceId,
+        'latitude': 16.2356,
+        'longitude': 80.0498,
+        'accuracy': 10.5,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+    }
+
     return {};
   }
 
@@ -190,7 +243,6 @@ class ApiService {
       final email = data?['email'] as String? ?? 'user@example.com';
       final password = data?['password'] as String? ?? '';
 
-      // Test bad credentials simulation if specific test password is sent
       if (password == 'wrongpassword') {
         throw const ApiException(
           message: 'Invalid email or password. Please try again.',
@@ -222,6 +274,29 @@ class ApiService {
           'name': name,
           'email': email,
         },
+      };
+    }
+
+    // Match POST /devices/{id}/location/
+    final locationRegex = RegExp(r'^devices/(\d+)/location/?$');
+    final match = locationRegex.firstMatch(endpoint);
+    if (match != null) {
+      final deviceId = int.parse(match.group(1)!);
+      final timestamp = DateTime.now().toIso8601String();
+      final locationData = {
+        'device_id': deviceId,
+        'latitude': (data?['latitude'] as num?)?.toDouble() ?? 16.2356,
+        'longitude': (data?['longitude'] as num?)?.toDouble() ?? 80.0498,
+        'accuracy': (data?['accuracy'] as num?)?.toDouble() ?? 10.0,
+        'timestamp': timestamp,
+      };
+
+      _mockDeviceLocations[deviceId] = locationData;
+      _mockLocationHistories.putIfAbsent(deviceId, () => []).add(locationData);
+
+      return {
+        'success': true,
+        'timestamp': timestamp,
       };
     }
 
