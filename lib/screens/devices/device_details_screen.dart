@@ -208,6 +208,15 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                           },
                         ),
                         _buildActionTile(
+                          icon: Icons.security_rounded,
+                          title: 'Background Protection',
+                          subtitle: 'Configure automated background tracking & intervals',
+                          color: AppColors.online,
+                          onTap: () {
+                            Navigator.pushNamed(context, AppRoutes.backgroundTracking, arguments: device);
+                          },
+                        ),
+                        _buildActionTile(
                           icon: Icons.volume_up_outlined,
                           title: 'Play Sound',
                           subtitle: 'Ring device at maximum volume to locate nearby',

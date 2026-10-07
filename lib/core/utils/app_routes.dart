@@ -10,6 +10,7 @@ import '../../screens/devices/add_device_screen.dart';
 import '../../screens/location/location_status_screen.dart';
 import '../../screens/location/map_screen.dart';
 import '../../screens/location/location_history_screen.dart';
+import '../../screens/location/background_tracking_screen.dart';
 
 class AppRoutes {
   static const String splash = '/splash';
@@ -22,6 +23,7 @@ class AppRoutes {
   static const String location = '/location';
   static const String map = '/map';
   static const String locationHistory = '/devices/history';
+  static const String backgroundTracking = '/location/background';
 
   static Map<String, WidgetBuilder> get routes => {
         splash: (context) => const SplashScreen(),
@@ -33,6 +35,7 @@ class AppRoutes {
         location: (context) => const LocationStatusScreen(),
         map: (context) => const MapScreen(),
         locationHistory: (context) => const LocationHistoryScreen(),
+        backgroundTracking: (context) => const BackgroundTrackingScreen(),
       };
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -81,6 +84,22 @@ class AppRoutes {
       }
       return MaterialPageRoute(
         builder: (context) => const LocationHistoryScreen(),
+      );
+    }
+
+    if (settings.name == backgroundTracking) {
+      final args = settings.arguments;
+      if (args is DeviceModel) {
+        return MaterialPageRoute(
+          builder: (context) => BackgroundTrackingScreen(device: args),
+        );
+      } else if (args is int) {
+        return MaterialPageRoute(
+          builder: (context) => BackgroundTrackingScreen(deviceId: args),
+        );
+      }
+      return MaterialPageRoute(
+        builder: (context) => const BackgroundTrackingScreen(),
       );
     }
 

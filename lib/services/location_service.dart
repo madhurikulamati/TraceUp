@@ -54,6 +54,27 @@ class LocationService {
     }
   }
 
+  /// Checks whether background location permission ("Allow all the time") is granted
+  Future<bool> hasBackgroundPermission() async {
+    if (_isTest) return true;
+    try {
+      final permission = await Geolocator.checkPermission();
+      return permission == LocationPermission.always;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Prompts for background location permission (upgrading from whileInUse to always)
+  Future<LocationPermission> requestBackgroundPermission() async {
+    if (_isTest) return LocationPermission.always;
+    try {
+      return await Geolocator.requestPermission();
+    } catch (_) {
+      return LocationPermission.whileInUse;
+    }
+  }
+
   /// Obtains current GPS coordinates with accuracy and timestamp
   /// Throws friendly ApiException if permissions are denied or service is disabled.
   Future<LocationModel> getCurrentLocation() async {
