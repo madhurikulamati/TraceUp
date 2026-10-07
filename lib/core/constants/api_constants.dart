@@ -22,4 +22,9 @@ class ApiConstants {
   static String deviceDetailEndpoint(int id) => 'devices/$id/';
   static String deviceLocationEndpoint(int id) => 'devices/$id/location/';
   static String deviceLocationsEndpoint(int id) => 'devices/$id/locations/';
+
+  // WebSocket endpoints
+  static const String baseWsUrl = 'ws://10.0.2.2:8000/ws/';
+  static String deviceWsEndpoint(int deviceId) => 'devices/$deviceId/';
+  static Uri deviceWsUri(int deviceId) => Uri.parse('$baseWsUrl${deviceWsEndpoint(deviceId)}');
 }
