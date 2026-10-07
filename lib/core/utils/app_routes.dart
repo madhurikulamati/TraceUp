@@ -9,6 +9,7 @@ import '../../screens/devices/device_details_screen.dart';
 import '../../screens/devices/add_device_screen.dart';
 import '../../screens/location/location_status_screen.dart';
 import '../../screens/location/map_screen.dart';
+import '../../screens/location/location_history_screen.dart';
 
 class AppRoutes {
   static const String splash = '/splash';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const String deviceDetails = '/devices/details';
   static const String location = '/location';
   static const String map = '/map';
+  static const String locationHistory = '/devices/history';
 
   static Map<String, WidgetBuilder> get routes => {
         splash: (context) => const SplashScreen(),
@@ -30,6 +32,7 @@ class AppRoutes {
         addDevice: (context) => const AddDeviceScreen(),
         location: (context) => const LocationStatusScreen(),
         map: (context) => const MapScreen(),
+        locationHistory: (context) => const LocationHistoryScreen(),
       };
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -62,6 +65,22 @@ class AppRoutes {
       }
       return MaterialPageRoute(
         builder: (context) => const MapScreen(),
+      );
+    }
+
+    if (settings.name == locationHistory) {
+      final args = settings.arguments;
+      if (args is DeviceModel) {
+        return MaterialPageRoute(
+          builder: (context) => LocationHistoryScreen(device: args),
+        );
+      } else if (args is int) {
+        return MaterialPageRoute(
+          builder: (context) => LocationHistoryScreen(deviceId: args),
+        );
+      }
+      return MaterialPageRoute(
+        builder: (context) => const LocationHistoryScreen(),
       );
     }
 

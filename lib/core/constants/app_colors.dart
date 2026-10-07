@@ -15,6 +15,7 @@ class AppColors {
   static const Color offline = Color(0xFF6B7280); // Gray
   static const Color warning = Color(0xFFF59E0B); // Amber
   static const Color error = Color(0xFFEF4444); // Red
+  static const Color info = Color(0xFF0284C7); // Sky blue
 
   // Background & Surfaces
   static const Color background = Color(0xFFF8FAFC); // Slate 50

@@ -199,6 +199,15 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                           },
                         ),
                         _buildActionTile(
+                          icon: Icons.history_rounded,
+                          title: 'Location History',
+                          subtitle: 'View chronological GPS timeline and logs',
+                          color: AppColors.info,
+                          onTap: () {
+                            Navigator.pushNamed(context, AppRoutes.locationHistory, arguments: device);
+                          },
+                        ),
+                        _buildActionTile(
                           icon: Icons.volume_up_outlined,
                           title: 'Play Sound',
                           subtitle: 'Ring device at maximum volume to locate nearby',
