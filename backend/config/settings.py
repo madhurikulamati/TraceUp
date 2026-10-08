@@ -15,6 +15,7 @@ ALLOWED_HOSTS = ['*']
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -26,6 +27,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'channels',
 
     # Internal apps
     'accounts',
@@ -161,4 +163,26 @@ REDIS_DB = int(os.environ.get('REDIS_DB', 0))
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', None)
 REDIS_URL = os.environ.get('REDIS_URL', f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}')
 USE_FAKE_REDIS = os.environ.get('USE_FAKE_REDIS', 'False') == 'True'
+
+# Channels & ASGI Configuration
+ASGI_APPLICATION = 'config.asgi.application'
+
+USE_INMEMORY_CHANNEL_LAYER = os.environ.get('USE_INMEMORY_CHANNEL_LAYER', 'False') == 'True'
+
+if USE_INMEMORY_CHANNEL_LAYER:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+            },
+        },
+    }
+
 

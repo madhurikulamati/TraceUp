@@ -11,6 +11,11 @@ from devices.models import Device
 from locations.models import Location
 from tracking.redis_service import RedisService
 
+from channels.testing import WebsocketCommunicator
+from channels.db import database_sync_to_async
+from config.asgi import application
+from tracking.consumers import TrackingConsumer
+
 User = get_user_model()
 
 class RedisIntegrationAPITestCase(TestCase):
@@ -32,7 +37,6 @@ class RedisIntegrationAPITestCase(TestCase):
         self.state_url_b = reverse('device-state', kwargs={'pk': self.device_b.id})
 
     def tearDown(self):
-        # Clean up Redis keys created during test run
         RedisService.delete_device_state(self.device_a.id)
         RedisService.delete_device_state(self.device_b.id)
 
@@ -180,3 +184,251 @@ class RedisIntegrationAPITestCase(TestCase):
 
         response = jwt_client.post(self.state_url_a, {"status": "online"}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.db import connections
+
+@override_settings(CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}})
+class WebSocketAPITestCase(TransactionTestCase):
+
+    def setUp(self):
+        connections.close_all()
+        self.user_a = User.objects.create_user(email="ws_user_a@example.com", name="User A", password="password123")
+        self.user_b = User.objects.create_user(email="ws_user_b@example.com", name="User B", password="password123")
+
+        self.token_a = str(RefreshToken.for_user(self.user_a).access_token)
+        self.token_b = str(RefreshToken.for_user(self.user_b).access_token)
+
+        self.device_a = Device.objects.create(user=self.user_a, name="User A Phone", device_identifier="ws-id-a")
+        self.device_b = Device.objects.create(user=self.user_b, name="User B Phone", device_identifier="ws-id-b")
+
+    def tearDown(self):
+        RedisService.delete_device_state(self.device_a.id)
+        RedisService.delete_device_state(self.device_b.id)
+        connections.close_all()
+
+    # -------------------------------------------------------------------------
+    # 1. CHANNELS CONFIGURATION & AUTHENTICATION TESTS
+    # -------------------------------------------------------------------------
+    def test_23_channels_configuration_loads(self):
+        self.assertTrue(hasattr(settings, 'ASGI_APPLICATION'))
+        self.assertTrue(hasattr(settings, 'CHANNEL_LAYERS'))
+
+    def test_24_asgi_application_loads(self):
+        self.assertIsNotNone(application)
+
+    async def test_25_unauthenticated_websocket_connection_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/")
+        connected, _ = await communicator.connect()
+        self.assertFalse(connected)
+
+    async def test_26_authenticated_websocket_connection_succeeds(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        await communicator.disconnect()
+
+    async def test_27_cross_user_websocket_connection_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_b.id}/?token={self.token_a}")
+        connected, _ = await communicator.connect()
+        self.assertFalse(connected)
+
+    async def test_28_nonexistent_device_websocket_connection_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/99999/?token={self.token_a}")
+        connected, _ = await communicator.connect()
+        self.assertFalse(connected)
+
+    # -------------------------------------------------------------------------
+    # 2. WEBSOCKET REAL-TIME BROADCAST & PERSISTENCE TESTS
+    # -------------------------------------------------------------------------
+    async def test_29_valid_location_update_broadcast_and_persisted(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        msg = {
+            "type": "location_update",
+            "device_id": self.device_a.id,
+            "latitude": 17.6868,
+            "longitude": 83.2185,
+            "accuracy": 10.5
+        }
+        await communicator.send_json_to(msg)
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "location_update")
+        self.assertEqual(response['latitude'], 17.6868)
+        self.assertEqual(response['longitude'], 83.2185)
+        self.assertEqual(response['device_id'], self.device_a.id)
+
+        # Verify PostgreSQL persistence asynchronously
+        count = await database_sync_to_async(Location.objects.filter(device=self.device_a).count)()
+        self.assertEqual(count, 1)
+
+        await communicator.disconnect()
+
+    async def test_30_multiple_clients_same_device_receive_broadcast(self):
+        c1 = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        c2 = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+
+        self.assertTrue((await c1.connect())[0])
+        self.assertTrue((await c2.connect())[0])
+
+        msg = {
+            "type": "location_update",
+            "device_id": self.device_a.id,
+            "latitude": 10.0,
+            "longitude": 20.0,
+            "accuracy": 5.0
+        }
+        await c1.send_json_to(msg)
+
+        r1 = await c1.receive_json_from()
+        r2 = await c2.receive_json_from()
+
+        self.assertEqual(r1['latitude'], 10.0)
+        self.assertEqual(r2['latitude'], 10.0)
+
+        await c1.disconnect()
+        await c2.disconnect()
+
+    async def test_31_group_isolation_between_devices(self):
+        c_a = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        c_b = WebsocketCommunicator(application, f"/ws/devices/{self.device_b.id}/?token={self.token_b}")
+
+        self.assertTrue((await c_a.connect())[0])
+        self.assertTrue((await c_b.connect())[0])
+
+        msg = {
+            "type": "location_update",
+            "device_id": self.device_a.id,
+            "latitude": 10.0,
+            "longitude": 20.0,
+            "accuracy": 5.0
+        }
+        await c_a.send_json_to(msg)
+
+        r_a = await c_a.receive_json_from()
+        self.assertEqual(r_a['latitude'], 10.0)
+
+        # Client B should NOT receive Client A's message
+        self.assertTrue(await c_b.receive_nothing())
+
+        await c_a.disconnect()
+        await c_b.disconnect()
+
+    # -------------------------------------------------------------------------
+    # 3. INPUT VALIDATION & ERROR HANDLING TESTS
+    # -------------------------------------------------------------------------
+    async def test_32_malformed_json_rejected_with_error_payload(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        await communicator.send_to(text_data="not-valid-json")
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "MALFORMED_JSON")
+        await communicator.disconnect()
+
+    async def test_33_unsupported_message_type_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        await communicator.send_json_to({"type": "unknown_command"})
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "UNSUPPORTED_TYPE")
+        await communicator.disconnect()
+
+    async def test_34_device_id_mismatch_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        msg = {
+            "type": "location_update",
+            "device_id": self.device_b.id,
+            "latitude": 10.0,
+            "longitude": 20.0
+        }
+        await communicator.send_json_to(msg)
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "DEVICE_ID_MISMATCH")
+        await communicator.disconnect()
+
+    async def test_35_missing_coordinates_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        msg = {"type": "location_update", "latitude": 10.0}
+        await communicator.send_json_to(msg)
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "MISSING_COORDINATES")
+        await communicator.disconnect()
+
+    async def test_36_invalid_latitude_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        msg = {"type": "location_update", "latitude": 95.0, "longitude": 20.0}
+        await communicator.send_json_to(msg)
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "INVALID_LATITUDE")
+        await communicator.disconnect()
+
+    async def test_37_invalid_longitude_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        msg = {"type": "location_update", "latitude": 10.0, "longitude": 200.0}
+        await communicator.send_json_to(msg)
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "INVALID_LONGITUDE")
+        await communicator.disconnect()
+
+    async def test_38_negative_accuracy_rejected(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        msg = {"type": "location_update", "latitude": 10.0, "longitude": 20.0, "accuracy": -5.0}
+        await communicator.send_json_to(msg)
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response['type'], "error")
+        self.assertEqual(response['code'], "INVALID_ACCURACY")
+        await communicator.disconnect()
+
+    async def test_39_disconnect_cleanup(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        await communicator.disconnect()
+
+    async def test_40_redis_state_refreshed_on_websocket_update(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        await communicator.connect()
+
+        msg = {
+            "type": "location_update",
+            "device_id": self.device_a.id,
+            "latitude": 10.0,
+            "longitude": 20.0,
+            "accuracy": 5.0
+        }
+        await communicator.send_json_to(msg)
+        await communicator.receive_json_from()
+
+        state = await database_sync_to_async(RedisService.get_device_state)(self.device_a.id)
+        self.assertIsNotNone(state)
+        self.assertEqual(state['status'], "online")
+        await communicator.disconnect()

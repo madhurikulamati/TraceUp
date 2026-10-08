@@ -94,7 +94,9 @@ erDiagram
 
 Redis is integrated strictly as a high-performance in-memory cache/state engine for temporary, short-lived device status and heartbeat tracking. **PostgreSQL remains the sole permanent source of truth.**
 
-| Key Pattern | Data Structure | TTL | Description |
+| Key Pattern | Data Structure | TTL / Scope | Description |
 |---|---|---|---|
 | `traceup:device:{device_id}:state` | String (JSON) | 300s (Default) | Stores transient device activity, online status, battery level, and last activity timestamp. Auto-expires when inactive. |
+| `traceup_device_{device_id}` | Channel Group | Real-Time Pub/Sub | Django Channels Redis channel layer group for broadcasting real-time location updates to authorized connected WebSocket clients. |
+
 

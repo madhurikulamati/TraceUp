@@ -296,3 +296,48 @@ This document forms the binding REST API contract between Backend and Frontend (
 }
 ```
 
+---
+
+## 6. Real-Time Tracking Endpoints (WebSocket Integration)
+
+### Device Real-Time Location WebSocket
+- **Protocol**: `WS` / `WSS`
+- **URL**: `ws://<SERVER_HOST>:<PORT>/ws/devices/{device_id}/?token=<JWT_ACCESS_TOKEN>`
+- **Authentication**: JWT Access Token via query parameter `?token=<access_token>` or `Authorization` header (`Bearer <access_token>`).
+- **Authorization**: Must own device (`device.user == request.user`). Unauthenticated connections are closed with code `4401`. Unauthorized device access is closed with code `4403`.
+
+#### Client Location Update Payload:
+```json
+{
+  "type": "location_update",
+  "device_id": 101,
+  "latitude": 17.6868,
+  "longitude": 83.2185,
+  "accuracy": 10.5
+}
+```
+
+#### Server Broadcast Message (to device group `traceup_device_{device_id}`):
+```json
+{
+  "type": "location_update",
+  "id": 502,
+  "device_id": 101,
+  "latitude": 17.6868,
+  "longitude": 83.2185,
+  "accuracy": 10.5,
+  "timestamp": "2026-10-08T15:30:00.000000+00:00"
+}
+```
+
+#### Structured Error Response Format:
+```json
+{
+  "type": "error",
+  "code": "INVALID_LATITUDE",
+  "message": "Latitude must be between -90 and 90."
+}
+```
+- **Error Codes**: `MALFORMED_JSON`, `UNSUPPORTED_TYPE`, `DEVICE_ID_MISMATCH`, `MISSING_COORDINATES`, `INVALID_COORDINATES_TYPE`, `INVALID_LATITUDE`, `INVALID_LONGITUDE`, `INVALID_ACCURACY`.
+
+
