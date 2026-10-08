@@ -237,3 +237,62 @@ This document forms the binding REST API contract between Backend and Frontend (
   "message": "Lost mode command sent to device 'Pixel 8 Pro'"
 }
 ```
+
+---
+
+## 5. Temporary Device State Endpoints (Redis Integration)
+
+### Update Temporary Device State
+- **Method**: `POST`
+- **URL**: `/api/devices/{id}/state/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Request Body**:
+```json
+{
+  "status": "online",
+  "battery_level": 85,
+  "ttl": 300
+}
+```
+- **Response** (200 OK):
+```json
+{
+  "device_id": 101,
+  "status": "online",
+  "last_activity": "2026-10-08T14:50:00+05:30",
+  "battery_level": 85
+}
+```
+
+---
+
+### Get Temporary Device State
+- **Method**: `GET`
+- **URL**: `/api/devices/{id}/state/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Response** (200 OK):
+```json
+{
+  "device_id": 101,
+  "status": "online",
+  "last_activity": "2026-10-08T14:50:00+05:30",
+  "battery_level": 85,
+  "ttl_remaining": 295
+}
+```
+- **Error** (404 Not Found): If temporary state has expired in Redis or device does not exist/belong to authenticated user.
+
+---
+
+### Delete Temporary Device State
+- **Method**: `DELETE`
+- **URL**: `/api/devices/{id}/state/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Response** (200 OK):
+```json
+{
+  "success": true,
+  "deleted": true
+}
+```
+

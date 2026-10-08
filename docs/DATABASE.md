@@ -87,3 +87,14 @@ erDiagram
         datetime timestamp
     }
 ```
+
+---
+
+## 4. Redis Temporary Key-Value Storage Architecture
+
+Redis is integrated strictly as a high-performance in-memory cache/state engine for temporary, short-lived device status and heartbeat tracking. **PostgreSQL remains the sole permanent source of truth.**
+
+| Key Pattern | Data Structure | TTL | Description |
+|---|---|---|---|
+| `traceup:device:{device_id}:state` | String (JSON) | 300s (Default) | Stores transient device activity, online status, battery level, and last activity timestamp. Auto-expires when inactive. |
+
