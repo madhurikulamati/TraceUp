@@ -9,6 +9,9 @@ class Device(models.Model):
     is_online = models.BooleanField(default=False)
     battery_level = models.IntegerField(default=100)
     last_seen = models.DateTimeField(null=True, blank=True)
+    is_lost_mode = models.BooleanField(default=False)
+    lost_mode_enabled_at = models.DateTimeField(null=True, blank=True)
+    lost_mode_updated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

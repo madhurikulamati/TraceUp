@@ -13,10 +13,13 @@ class DeviceSerializer(serializers.ModelSerializer):
             'is_online',
             'battery_level',
             'last_seen',
+            'is_lost_mode',
+            'lost_mode_enabled_at',
+            'lost_mode_updated_at',
             'created_at',
             'updated_at',
         )
-        read_only_fields = ('id', 'user', 'last_seen', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'user', 'last_seen', 'is_lost_mode', 'lost_mode_enabled_at', 'lost_mode_updated_at', 'created_at', 'updated_at')
 
     def validate_name(self, value):
         if not value or not value.strip():

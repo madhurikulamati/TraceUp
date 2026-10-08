@@ -210,33 +210,82 @@ This document forms the binding REST API contract between Backend and Frontend (
 
 ---
 
-## 4. Device Command Endpoints
+## 4. Device Command Endpoints (Phase 6 Remote Control)
 
 ### Ring Device
 - **Method**: `POST`
 - **URL**: `/api/devices/{id}/ring/`
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Owner only (`device.user == request.user`)
 - **Response** (200 OK):
 ```json
 {
   "success": true,
-  "message": "Ring command sent to device 'Pixel 8 Pro'"
+  "message": "Ring command sent to device 'Pixel 8 Pro'",
+  "device_id": 101
 }
 ```
+- **Error** (404 Not Found): If device does not exist or belongs to another user.
+- **WebSocket Behavior**: Dispatches real-time `ring_command` event to connected target device group `traceup_device_{id}`.
 
 ---
 
-### Lost Mode
+### Enable Lost Mode
 - **Method**: `POST`
 - **URL**: `/api/devices/{id}/lost-mode/`
 - **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Owner only (`device.user == request.user`)
 - **Response** (200 OK):
 ```json
 {
   "success": true,
-  "message": "Lost mode command sent to device 'Pixel 8 Pro'"
+  "message": "Lost mode enabled for device 'Pixel 8 Pro'",
+  "device_id": 101,
+  "is_lost_mode": true,
+  "lost_mode_enabled_at": "2026-10-08T15:00:00.000000+00:00",
+  "lost_mode_updated_at": "2026-10-08T15:00:00.000000+00:00"
 }
 ```
+- **Error** (404 Not Found): If device does not exist or belongs to another user.
+- **WebSocket Behavior**: Dispatches real-time `lost_mode_update` broadcast to connected target device group `traceup_device_{id}` with `"is_lost_mode": true`.
+
+---
+
+### Disable Lost Mode
+- **Method**: `DELETE`
+- **URL**: `/api/devices/{id}/lost-mode/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Owner only (`device.user == request.user`)
+- **Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Lost mode disabled for device 'Pixel 8 Pro'",
+  "device_id": 101,
+  "is_lost_mode": false,
+  "lost_mode_updated_at": "2026-10-08T15:10:00.000000+00:00"
+}
+```
+- **Error** (404 Not Found): If device does not exist or belongs to another user.
+- **WebSocket Behavior**: Dispatches real-time `lost_mode_update` broadcast to connected target device group `traceup_device_{id}` with `"is_lost_mode": false`.
+
+---
+
+### Get Lost Mode Status
+- **Method**: `GET`
+- **URL**: `/api/devices/{id}/lost-mode/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Owner only (`device.user == request.user`)
+- **Response** (200 OK):
+```json
+{
+  "device_id": 101,
+  "is_lost_mode": true,
+  "lost_mode_enabled_at": "2026-10-08T15:00:00.000000+00:00",
+  "lost_mode_updated_at": "2026-10-08T15:00:00.000000+00:00"
+}
+```
+- **Error** (404 Not Found): If device does not exist or belongs to another user.
 
 ---
 
@@ -300,7 +349,7 @@ This document forms the binding REST API contract between Backend and Frontend (
 
 ## 6. Real-Time Tracking Endpoints (WebSocket Integration)
 
-### Device Real-Time Location WebSocket
+### Device Real-Time Location & Command WebSocket
 - **Protocol**: `WS` / `WSS`
 - **URL**: `ws://<SERVER_HOST>:<PORT>/ws/devices/{device_id}/?token=<JWT_ACCESS_TOKEN>`
 - **Authentication**: JWT Access Token via query parameter `?token=<access_token>` or `Authorization` header (`Bearer <access_token>`).
@@ -317,7 +366,9 @@ This document forms the binding REST API contract between Backend and Frontend (
 }
 ```
 
-#### Server Broadcast Message (to device group `traceup_device_{device_id}`):
+#### Server Broadcast Messages (to target device group `traceup_device_{device_id}`):
+
+1. **Location Update Broadcast**:
 ```json
 {
   "type": "location_update",
@@ -330,6 +381,25 @@ This document forms the binding REST API contract between Backend and Frontend (
 }
 ```
 
+2. **Ring Command Message**:
+```json
+{
+  "type": "ring_command",
+  "device_id": 101
+}
+```
+
+3. **Lost Mode Update Message**:
+```json
+{
+  "type": "lost_mode_update",
+  "device_id": 101,
+  "is_lost_mode": true,
+  "lost_mode_enabled_at": "2026-10-08T15:00:00.000000+00:00",
+  "lost_mode_updated_at": "2026-10-08T15:00:00.000000+00:00"
+}
+```
+
 #### Structured Error Response Format:
 ```json
 {
@@ -339,5 +409,6 @@ This document forms the binding REST API contract between Backend and Frontend (
 }
 ```
 - **Error Codes**: `MALFORMED_JSON`, `UNSUPPORTED_TYPE`, `DEVICE_ID_MISMATCH`, `MISSING_COORDINATES`, `INVALID_COORDINATES_TYPE`, `INVALID_LATITUDE`, `INVALID_LONGITUDE`, `INVALID_ACCURACY`.
+
 
 

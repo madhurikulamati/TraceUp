@@ -33,6 +33,9 @@ Represents an Android or mobile device linked to a user.
 | `is_online` | BooleanField | Default: `False` |
 | `battery_level` | IntegerField | Range 0 to 100, Default: 100 |
 | `last_seen` | DateTimeField | Nullable, updated on location push |
+| `is_lost_mode` | BooleanField | Default: `False`, Phase 6 Lost Mode flag |
+| `lost_mode_enabled_at` | DateTimeField | Nullable, timestamp when Lost Mode was enabled |
+| `lost_mode_updated_at` | DateTimeField | Nullable, timestamp of last Lost Mode toggle |
 | `created_at` | DateTimeField | Auto add timestamp |
 | `updated_at` | DateTimeField | Auto update timestamp |
 

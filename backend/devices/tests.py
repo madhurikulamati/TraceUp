@@ -267,3 +267,172 @@ class DeviceAPITestCase(TestCase):
 
         response = jwt_client.get(self.devices_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+from django.test import TransactionTestCase, override_settings
+from channels.testing import WebsocketCommunicator
+from channels.db import database_sync_to_async
+from config.asgi import application
+
+@override_settings(CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}})
+class RingAndLostModeAPITestCase(TransactionTestCase):
+
+    def setUp(self):
+        self.unauthenticated_client = APIClient()
+        self.client_a = APIClient()
+        self.client_b = APIClient()
+
+        self.user_a = User.objects.create_user(email="ring_user_a@example.com", name="User A", password="password123")
+        self.user_b = User.objects.create_user(email="ring_user_b@example.com", name="User B", password="password123")
+
+        self.client_a.force_authenticate(user=self.user_a)
+        self.client_b.force_authenticate(user=self.user_b)
+
+        self.token_a = str(RefreshToken.for_user(self.user_a).access_token)
+        self.token_b = str(RefreshToken.for_user(self.user_b).access_token)
+
+        self.device_a = Device.objects.create(user=self.user_a, name="User A Phone", device_identifier="ring-id-a")
+        self.device_b = Device.objects.create(user=self.user_b, name="User B Phone", device_identifier="ring-id-b")
+
+        self.ring_url_a = reverse('device-ring', kwargs={'pk': self.device_a.id})
+        self.ring_url_b = reverse('device-ring', kwargs={'pk': self.device_b.id})
+
+        self.lost_mode_url_a = reverse('device-lost-mode', kwargs={'pk': self.device_a.id})
+        self.lost_mode_url_b = reverse('device-lost-mode', kwargs={'pk': self.device_b.id})
+
+    # -------------------------------------------------------------------------
+    # 1. RING REST API TESTS
+    # -------------------------------------------------------------------------
+    def test_unauthenticated_ring_rejected(self):
+        response = self.unauthenticated_client.post(self.ring_url_a)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_owner_ring_success(self):
+        response = self.client_a.post(self.ring_url_a)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['device_id'], self.device_a.id)
+
+    def test_cross_user_ring_rejected(self):
+        response = self.client_a.post(self.ring_url_b)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_nonexistent_device_ring_rejected(self):
+        url = reverse('device-ring', kwargs={'pk': 99999})
+        response = self.client_a.post(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # -------------------------------------------------------------------------
+    # 2. LOST MODE REST API TESTS
+    # -------------------------------------------------------------------------
+    def test_unauthenticated_lost_mode_enable_rejected(self):
+        response = self.unauthenticated_client.post(self.lost_mode_url_a)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unauthenticated_lost_mode_disable_rejected(self):
+        response = self.unauthenticated_client.delete(self.lost_mode_url_a)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unauthenticated_lost_mode_status_rejected(self):
+        response = self.unauthenticated_client.get(self.lost_mode_url_a)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_owner_enable_lost_mode_success(self):
+        response = self.client_a.post(self.lost_mode_url_a)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        self.assertTrue(response.data['is_lost_mode'])
+
+        self.device_a.refresh_from_db()
+        self.assertTrue(self.device_a.is_lost_mode)
+        self.assertIsNotNone(self.device_a.lost_mode_enabled_at)
+
+    def test_owner_get_lost_mode_status(self):
+        self.client_a.post(self.lost_mode_url_a)
+        response = self.client_a.get(self.lost_mode_url_a)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_lost_mode'])
+        self.assertEqual(response.data['device_id'], self.device_a.id)
+
+    def test_owner_disable_lost_mode_success(self):
+        self.client_a.post(self.lost_mode_url_a)
+        response = self.client_a.delete(self.lost_mode_url_a)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_lost_mode'])
+
+        self.device_a.refresh_from_db()
+        self.assertFalse(self.device_a.is_lost_mode)
+
+    def test_enable_lost_mode_idempotent(self):
+        r1 = self.client_a.post(self.lost_mode_url_a)
+        t1 = r1.data['lost_mode_enabled_at']
+        r2 = self.client_a.post(self.lost_mode_url_a)
+        t2 = r2.data['lost_mode_enabled_at']
+        self.assertEqual(t1, t2)
+
+    def test_cross_user_enable_lost_mode_rejected(self):
+        response = self.client_a.post(self.lost_mode_url_b)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_cross_user_disable_lost_mode_rejected(self):
+        response = self.client_a.delete(self.lost_mode_url_b)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_cross_user_get_lost_mode_status_rejected(self):
+        response = self.client_a.get(self.lost_mode_url_b)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_nonexistent_device_lost_mode_rejected(self):
+        url = reverse('device-lost-mode', kwargs={'pk': 99999})
+        response = self.client_a.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # -------------------------------------------------------------------------
+    # 3. WEBSOCKET REAL-TIME DELIVERIES
+    # -------------------------------------------------------------------------
+    async def test_websocket_ring_command_delivered_to_target_device(self):
+        communicator_a = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        communicator_b = WebsocketCommunicator(application, f"/ws/devices/{self.device_b.id}/?token={self.token_b}")
+
+        self.assertTrue((await communicator_a.connect())[0])
+        self.assertTrue((await communicator_b.connect())[0])
+
+        # Trigger REST API ring for Device A asynchronously
+        await database_sync_to_async(self.client_a.post)(self.ring_url_a)
+
+        response_a = await communicator_a.receive_json_from()
+        self.assertEqual(response_a['type'], "ring_command")
+        self.assertEqual(response_a['device_id'], self.device_a.id)
+
+        # Device B should receive nothing
+        self.assertTrue(await communicator_b.receive_nothing())
+
+        await communicator_a.disconnect()
+        await communicator_b.disconnect()
+
+    async def test_websocket_lost_mode_enable_broadcast_delivered(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        self.assertTrue((await communicator.connect())[0])
+
+        await database_sync_to_async(self.client_a.post)(self.lost_mode_url_a)
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response['type'], "lost_mode_update")
+        self.assertEqual(response['device_id'], self.device_a.id)
+        self.assertTrue(response['is_lost_mode'])
+
+        await communicator.disconnect()
+
+    async def test_websocket_lost_mode_disable_broadcast_delivered(self):
+        communicator = WebsocketCommunicator(application, f"/ws/devices/{self.device_a.id}/?token={self.token_a}")
+        self.assertTrue((await communicator.connect())[0])
+
+        await database_sync_to_async(self.client_a.delete)(self.lost_mode_url_a)
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response['type'], "lost_mode_update")
+        self.assertEqual(response['device_id'], self.device_a.id)
+        self.assertFalse(response['is_lost_mode'])
+
+        await communicator.disconnect()
+

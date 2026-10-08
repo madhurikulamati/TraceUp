@@ -163,3 +163,9 @@ class TrackingConsumer(AsyncWebsocketConsumer):
 
     async def location_broadcast(self, event):
         await self.send(text_data=json.dumps(event['data']))
+
+    async def ring_command_broadcast(self, event):
+        await self.send(text_data=json.dumps(event['data']))
+
+    async def lost_mode_broadcast(self, event):
+        await self.send(text_data=json.dumps(event['data']))
