@@ -5,14 +5,23 @@ class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
         fields = ('id', 'device', 'latitude', 'longitude', 'accuracy', 'timestamp')
-        read_only_fields = ('id', 'device')
+        read_only_fields = ('id', 'device', 'timestamp')
 
     def validate_latitude(self, value):
+        if value is None:
+            raise serializers.ValidationError("Latitude is required.")
         if not (-90.0 <= value <= 90.0):
             raise serializers.ValidationError("Latitude must be between -90 and 90.")
         return value
 
     def validate_longitude(self, value):
+        if value is None:
+            raise serializers.ValidationError("Longitude is required.")
         if not (-180.0 <= value <= 180.0):
             raise serializers.ValidationError("Longitude must be between -180 and 180.")
+        return value
+
+    def validate_accuracy(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Accuracy cannot be negative.")
         return value
