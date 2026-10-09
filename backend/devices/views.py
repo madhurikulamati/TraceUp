@@ -63,6 +63,21 @@ class DeviceRingView(APIView):
                 }
             )
 
+        # Send FCM push notification (non-blocking fallback)
+        try:
+            from notifications.firebase_service import send_fcm_notification
+            send_fcm_notification(
+                device=device,
+                title="TraceUp Ring Alert",
+                body=f"Your device '{device.name}' is requested to ring.",
+                data={
+                    "type": "ring",
+                    "device_id": str(device.id)
+                }
+            )
+        except Exception:
+            pass
+
         return Response({
             'success': True,
             'message': f"Ring command sent to device '{device.name}'",
@@ -110,6 +125,22 @@ class DeviceLostModeView(APIView):
                 }
             )
 
+        # Send FCM push notification for Lost Mode enable
+        try:
+            from notifications.firebase_service import send_fcm_notification
+            send_fcm_notification(
+                device=device,
+                title="TraceUp Lost Mode",
+                body=f"Lost Mode has been enabled for your device '{device.name}'.",
+                data={
+                    "type": "lost_mode_enabled",
+                    "device_id": str(device.id),
+                    "is_lost_mode": "true"
+                }
+            )
+        except Exception:
+            pass
+
         return Response({
             'success': True,
             'message': f"Lost mode enabled for device '{device.name}'",
@@ -142,6 +173,22 @@ class DeviceLostModeView(APIView):
                 }
             )
 
+        # Send FCM push notification for Lost Mode disable
+        try:
+            from notifications.firebase_service import send_fcm_notification
+            send_fcm_notification(
+                device=device,
+                title="TraceUp Lost Mode",
+                body=f"Lost Mode has been disabled for your device '{device.name}'.",
+                data={
+                    "type": "lost_mode_disabled",
+                    "device_id": str(device.id),
+                    "is_lost_mode": "false"
+                }
+            )
+        except Exception:
+            pass
+
         return Response({
             'success': True,
             'message': f"Lost mode disabled for device '{device.name}'",
@@ -149,5 +196,6 @@ class DeviceLostModeView(APIView):
             'is_lost_mode': False,
             'lost_mode_updated_at': device.lost_mode_updated_at.isoformat() if device.lost_mode_updated_at else None,
         }, status=status.HTTP_200_OK)
+
 
 

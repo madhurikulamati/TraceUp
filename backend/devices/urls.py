@@ -12,6 +12,10 @@ from locations.views import (
 from tracking.views import (
     DeviceStateView,
 )
+from notifications.views import (
+    FCMTokenManageView,
+    FCMTestNotificationView,
+)
 
 urlpatterns = [
     path('', DeviceListCreateView.as_view(), name='device-list-create'),
@@ -21,4 +25,7 @@ urlpatterns = [
     path('<int:pk>/state/', DeviceStateView.as_view(), name='device-state'),
     path('<int:pk>/ring/', DeviceRingView.as_view(), name='device-ring'),
     path('<int:pk>/lost-mode/', DeviceLostModeView.as_view(), name='device-lost-mode'),
+    path('<int:pk>/fcm-token/', FCMTokenManageView.as_view(), name='device-fcm-token'),
+    path('<int:pk>/fcm-test/', FCMTestNotificationView.as_view(), name='device-fcm-test'),
 ]
+

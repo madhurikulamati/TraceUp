@@ -410,5 +410,122 @@ This document forms the binding REST API contract between Backend and Frontend (
 ```
 - **Error Codes**: `MALFORMED_JSON`, `UNSUPPORTED_TYPE`, `DEVICE_ID_MISMATCH`, `MISSING_COORDINATES`, `INVALID_COORDINATES_TYPE`, `INVALID_LATITUDE`, `INVALID_LONGITUDE`, `INVALID_ACCURACY`.
 
+---
+
+## 7. Firebase Cloud Messaging (FCM) Endpoints (Phase 7 Push Notifications)
+
+### Register or Update Device FCM Token
+- **Method**: `POST`
+- **URL**: `/api/devices/{id}/fcm-token/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Device owner (`device.user == request.user`)
+- **Request Body**:
+```json
+{
+  "token": "eXz8...FCM_REGISTRATION_TOKEN_HERE..."
+}
+```
+- **Response** (200 OK / 201 Created):
+```json
+{
+  "success": true,
+  "message": "FCM registration token saved successfully.",
+  "data": {
+    "id": 1,
+    "user": 1,
+    "device": 101,
+    "token": "eXz8...FCM_REGISTRATION_TOKEN_HERE...",
+    "is_active": true,
+    "created_at": "2026-10-09T22:00:00Z",
+    "updated_at": "2026-10-09T22:00:00Z",
+    "last_used_at": null
+  }
+}
+```
+- **Error Responses**:
+  - `400 Bad Request`: Blank or missing `token`.
+  - `401 Unauthorized`: Unauthenticated request.
+  - `404 Not Found`: Device does not exist or belongs to another user.
+
+---
+
+### Unregister / Deactivate Device FCM Token
+- **Method**: `DELETE`
+- **URL**: `/api/devices/{id}/fcm-token/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Device owner (`device.user == request.user`)
+- **Request Body** (Optional):
+```json
+{
+  "token": "eXz8...FCM_REGISTRATION_TOKEN_HERE..."
+}
+```
+*Note: If `token` is omitted, all active tokens for this device are marked inactive.*
+- **Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "FCM token(s) unregistered successfully.",
+  "deactivated_count": 1,
+  "device_id": 101
+}
+```
+- **Error Responses**:
+  - `401 Unauthorized`: Unauthenticated request.
+  - `404 Not Found`: Device does not exist or belongs to another user.
+
+---
+
+### Send Test FCM Push Notification
+- **Method**: `POST`
+- **URL**: `/api/devices/{id}/fcm-test/`
+- **Authentication**: `Bearer <JWT_ACCESS_TOKEN>`
+- **Authorization**: Device owner (`device.user == request.user`)
+- **Request Body** (Optional):
+```json
+{
+  "title": "TraceUp Test Notification",
+  "body": "This is a test notification payload."
+}
+```
+- **Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Test FCM notification sent to 'Pixel 8 Pro'.",
+  "result": {
+    "success": true,
+    "sent_count": 1,
+    "failed_count": 0,
+    "deactivated_tokens": [],
+    "errors": []
+  }
+}
+```
+- **Error Responses**:
+  - `400 Bad Request`: No active FCM token registered for the specified device.
+  - `401 Unauthorized`: Unauthenticated request.
+  - `404 Not Found`: Device does not exist or belongs to another user.
+  - `503 Service Unavailable`: Firebase credentials not configured or initialization failed.
+
+---
+
+## 8. Flutter / Android FCM Integration Contract
+
+1. **Token Registration**: When the Flutter app starts or receives a new token via FirebaseMessaging `onTokenRefresh`, call `POST /api/devices/{device_id}/fcm-token/` with header `Authorization: Bearer <JWT_ACCESS_TOKEN>`.
+2. **Token Lifecycle**: When the user logs out or removes the device, call `DELETE /api/devices/{device_id}/fcm-token/`.
+3. **FCM Payload Schema**:
+   - `notification`:
+     - `title`: Short descriptive title (e.g. `"TraceUp Ring Alert"`, `"TraceUp Lost Mode"`)
+     - `body`: Human readable alert body
+   - `data` (Key-value map of strings):
+     - `type`: Notification trigger category:
+       - `"ring"`: Triggers remote ring sound on Android device.
+       - `"lost_mode_enabled"`: Locks device & displays owner contact info.
+       - `"lost_mode_disabled"`: Unlocks device back to normal mode.
+       - `"test_notification"`: Verification push.
+     - `device_id`: Target device ID string (e.g. `"101"`).
+
+
 
 

@@ -24,5 +24,15 @@ staticfiles/
 .DS_Store
 Thumbs.db
 
+# Secrets & Credentials
+.env
+.env.local
+*.pem
+*.key
+serviceAccountKey*.json
+firebase-key*.json
+secrets/
+
 # Antigravity artifacts
 .gemini/
+

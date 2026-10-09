@@ -55,12 +55,32 @@ Stores historical coordinate tracking records for each device.
 
 ---
 
+---
+
+## 4. FCM Token Model (`notifications_fcmtoken`)
+Stores persistent Firebase Cloud Messaging (FCM) registration tokens associated with users and devices.
+
+| Field Name | Type | Constraints / Details |
+|---|---|---|
+| `id` | BigAutoField | Primary Key, Auto Increment |
+| `user_id` | ForeignKey -> User | `on_delete=CASCADE`, `related_name='fcm_tokens'` |
+| `device_id` | ForeignKey -> Device | `on_delete=CASCADE`, `related_name='fcm_tokens'` |
+| `token` | CharField(500) | Unique, Indexed, FCM registration token string |
+| `is_active` | BooleanField | Default: `True`, Indexed, deactivated on token expiry/unregister |
+| `created_at` | DateTimeField | Auto add timestamp |
+| `updated_at` | DateTimeField | Auto update timestamp |
+| `last_used_at` | DateTimeField | Nullable, updated on successful push delivery |
+
+---
+
 ## Entity Relationship Diagram (ERD)
 
 ```mermaid
 erDiagram
     USER ||--o{ DEVICE : "owns"
     DEVICE ||--o{ LOCATION : "has history"
+    USER ||--o{ FCMTOKEN : "owns tokens"
+    DEVICE ||--o{ FCMTOKEN : "has tokens"
 
     USER {
         bigint id PK
@@ -79,6 +99,9 @@ erDiagram
         boolean is_online
         int battery_level
         datetime last_seen
+        boolean is_lost_mode
+        datetime lost_mode_enabled_at
+        datetime lost_mode_updated_at
     }
 
     LOCATION {
@@ -89,11 +112,22 @@ erDiagram
         float accuracy
         datetime timestamp
     }
+
+    FCMTOKEN {
+        bigint id PK
+        bigint user_id FK
+        bigint device_id FK
+        string token UK
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+        datetime last_used_at
+    }
 ```
 
 ---
 
-## 4. Redis Temporary Key-Value Storage Architecture
+## 5. Redis Temporary Key-Value Storage Architecture
 
 Redis is integrated strictly as a high-performance in-memory cache/state engine for temporary, short-lived device status and heartbeat tracking. **PostgreSQL remains the sole permanent source of truth.**
 
@@ -101,5 +135,6 @@ Redis is integrated strictly as a high-performance in-memory cache/state engine 
 |---|---|---|---|
 | `traceup:device:{device_id}:state` | String (JSON) | 300s (Default) | Stores transient device activity, online status, battery level, and last activity timestamp. Auto-expires when inactive. |
 | `traceup_device_{device_id}` | Channel Group | Real-Time Pub/Sub | Django Channels Redis channel layer group for broadcasting real-time location updates to authorized connected WebSocket clients. |
+
 
 

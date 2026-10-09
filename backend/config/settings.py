@@ -191,4 +191,8 @@ else:
         },
     }
 
+# Firebase Configuration
+FIREBASE_CREDENTIALS_PATH = os.environ.get('FIREBASE_CREDENTIALS_PATH', None)
+
+
 
