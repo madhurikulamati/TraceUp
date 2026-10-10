@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/api_constants.dart';
@@ -80,23 +81,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   // App Icon / Logo
                   Center(
                     child: Container(
-                      width: 68,
-                      height: 68,
+                      width: 88,
+                      height: 88,
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(18),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.25),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                            blurRadius: 28,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.track_changes_rounded,
-                        size: 38,
-                        color: Colors.white,
+                      child: Image.asset(
+                        AppAssets.appLogo,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),

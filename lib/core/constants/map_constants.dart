@@ -14,6 +14,7 @@ class MapConstants {
   static const String mapTilerApiKey = String.fromEnvironment('MAPTILER_API_KEY', defaultValue: '');
 
   /// Vector tile styles
+  static const String styleNavigation = 'assets/styles/traceup_navigation.json';
   static const String styleLiberty = 'https://tiles.openfreemap.org/styles/liberty';
   static const String styleBright = 'https://tiles.openfreemap.org/styles/bright';
   static const String styleVoyager = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
@@ -24,7 +25,7 @@ class MapConstants {
     if (mapTilerApiKey.isNotEmpty) {
       return 'https://api.maptiler.com/maps/streets-v2/style.json?key=$mapTilerApiKey';
     }
-    return styleLiberty;
+    return styleNavigation;
   }
 
   /// Initial map configuration
@@ -39,6 +40,7 @@ class MapConstants {
 }
 
 enum MapStyleType {
+  navigation,
   liberty,
   bright,
   voyager,
@@ -59,6 +61,12 @@ class MapStyleOption {
   });
 
   static const List<MapStyleOption> options = [
+    MapStyleOption(
+      type: MapStyleType.navigation,
+      label: 'TraceUp Navigation',
+      styleUrl: MapConstants.styleNavigation,
+      description: 'Vivid roads, building footprints & crisp street names',
+    ),
     MapStyleOption(
       type: MapStyleType.liberty,
       label: 'Liberty (Detailed)',

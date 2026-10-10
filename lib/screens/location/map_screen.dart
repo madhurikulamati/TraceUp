@@ -56,9 +56,16 @@ class _MapScreenState extends State<MapScreen> {
   bool _showSearchResults = false;
   Timer? _searchDebounceTimer;
 
-  // Markers and overlays
-  Circle? _accuracyCircle;
+  // Tracked Device Marker & Accuracy Circle (Emerald/Green Theme)
+  Circle? _deviceAccuracyCircle;
   Symbol? _deviceSymbol;
+
+  // My Current Phone Marker & Accuracy Circle (Navigation Blue Theme)
+  Circle? _userAccuracyCircle;
+  Circle? _userLocationDot;
+  Symbol? _userSymbol;
+
+  // Temporary Destination / Search Pin
   Symbol? _searchPinSymbol;
 
   WebSocketConnectionStatus _wsStatus = WebSocketConnectionStatus.disconnected;
@@ -100,7 +107,8 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _currentLocation = loc;
       });
-      _updateMapMarker();
+      // Smoothly update device marker without rebuilding the entire map or hijacking camera
+      _updateDeviceMarker();
     });
 
     _webSocketService.connect(id);
@@ -120,7 +128,7 @@ class _MapScreenState extends State<MapScreen> {
         _isLoading = false;
       });
 
-      _updateMapMarker();
+      _updateDeviceMarker();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -133,6 +141,7 @@ class _MapScreenState extends State<MapScreen> {
         );
         _isLoading = false;
       });
+      _updateDeviceMarker();
     }
   }
 
@@ -145,6 +154,8 @@ class _MapScreenState extends State<MapScreen> {
         _userLocation = userLoc;
         _isLocatingUser = false;
       });
+
+      _updateUserMarker();
 
       if (animateCamera && _mapController != null && !_isTest) {
         await _mapController!.animateCamera(
@@ -172,57 +183,147 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
-    _updateMapMarker();
+    _updateDeviceMarker();
+    _updateUserMarker();
   }
 
-  Future<void> _updateMapMarker() async {
+  void _onStyleLoaded() {
+    _deviceAccuracyCircle = null;
+    _deviceSymbol = null;
+    _userAccuracyCircle = null;
+    _userLocationDot = null;
+    _userSymbol = null;
+    _searchPinSymbol = null;
+    _updateDeviceMarker();
+    _updateUserMarker();
+  }
+
+  /// Updates the tracked device marker (emerald pin with device name and distinct accuracy ring)
+  Future<void> _updateDeviceMarker() async {
     if (_mapController == null || _currentLocation == null || _isTest) return;
 
     try {
-      final target = LatLng(_currentLocation!.latitude, _currentLocation!.longitude);
+      final devTarget = LatLng(_currentLocation!.latitude, _currentLocation!.longitude);
+      final devName = _device?.name ?? 'Device';
+      final accuracy = _currentLocation!.accuracy > 0 ? _currentLocation!.accuracy : 12.0;
 
-      // Add or update accuracy circle around tracked device
-      if (_accuracyCircle != null) {
+      // 1. Device accuracy circle (Soft emerald tint)
+      if (_deviceAccuracyCircle != null) {
         await _mapController!.updateCircle(
-          _accuracyCircle!,
+          _deviceAccuracyCircle!,
           CircleOptions(
-            geometry: target,
-            circleRadius: _currentLocation!.accuracy > 0 ? _currentLocation!.accuracy : 12.0,
+            geometry: devTarget,
+            circleRadius: accuracy,
           ),
         );
       } else {
-        _accuracyCircle = await _mapController!.addCircle(
+        _deviceAccuracyCircle = await _mapController!.addCircle(
           CircleOptions(
-            geometry: target,
-            circleRadius: _currentLocation!.accuracy > 0 ? _currentLocation!.accuracy : 12.0,
-            circleColor: '#3B82F6',
-            circleOpacity: 0.15,
-            circleStrokeColor: '#1D4ED8',
+            geometry: devTarget,
+            circleRadius: accuracy,
+            circleColor: '#10B981',
+            circleOpacity: 0.12,
+            circleStrokeColor: '#059669',
             circleStrokeWidth: 1.5,
             circleStrokeOpacity: 0.5,
           ),
         );
       }
 
-      // Add or update device marker symbol
+      // 2. Tracked device symbol marker
       if (_deviceSymbol != null) {
         await _mapController!.updateSymbol(
           _deviceSymbol!,
           SymbolOptions(
-            geometry: target,
-            textField: _device?.name ?? 'Device',
+            geometry: devTarget,
+            textField: devName,
           ),
         );
       } else {
         _deviceSymbol = await _mapController!.addSymbol(
           SymbolOptions(
-            geometry: target,
+            geometry: devTarget,
             iconImage: 'marker-15',
-            iconSize: 1.9,
-            textField: _device?.name ?? 'Device',
+            iconSize: 2.1,
+            textField: devName,
             textOffset: const Offset(0, 1.2),
-            textColor: '#1E3A8A',
+            textColor: '#065F46',
             textSize: 13,
+            textHaloColor: '#FFFFFF',
+            textHaloWidth: 2.0,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Updates my current phone marker (vivid navigation blue puck with GPS accuracy circle)
+  Future<void> _updateUserMarker() async {
+    if (_mapController == null || _userLocation == null || _isTest) return;
+
+    try {
+      final userTarget = LatLng(_userLocation!.latitude, _userLocation!.longitude);
+      final accuracy = _userLocation!.accuracy > 0 ? _userLocation!.accuracy : 15.0;
+
+      // 1. User GPS accuracy circle (Navigation blue tint)
+      if (_userAccuracyCircle != null) {
+        await _mapController!.updateCircle(
+          _userAccuracyCircle!,
+          CircleOptions(
+            geometry: userTarget,
+            circleRadius: accuracy,
+          ),
+        );
+      } else {
+        _userAccuracyCircle = await _mapController!.addCircle(
+          CircleOptions(
+            geometry: userTarget,
+            circleRadius: accuracy,
+            circleColor: '#3B82F6',
+            circleOpacity: 0.12,
+            circleStrokeColor: '#2563EB',
+            circleStrokeWidth: 1.5,
+            circleStrokeOpacity: 0.6,
+          ),
+        );
+      }
+
+      // 2. User Center GPS Puck (Vibrant navigation blue dot with crisp white border)
+      if (_userLocationDot != null) {
+        await _mapController!.updateCircle(
+          _userLocationDot!,
+          CircleOptions(geometry: userTarget),
+        );
+      } else {
+        _userLocationDot = await _mapController!.addCircle(
+          CircleOptions(
+            geometry: userTarget,
+            circleRadius: 7.5,
+            circleColor: '#2563EB',
+            circleOpacity: 1.0,
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: 2.5,
+            circleStrokeOpacity: 1.0,
+          ),
+        );
+      }
+
+      // 3. User label
+      if (_userSymbol != null) {
+        await _mapController!.updateSymbol(
+          _userSymbol!,
+          SymbolOptions(geometry: userTarget),
+        );
+      } else {
+        _userSymbol = await _mapController!.addSymbol(
+          SymbolOptions(
+            geometry: userTarget,
+            textField: 'My Location',
+            textOffset: const Offset(0, 1.2),
+            textColor: '#1E40AF',
+            textSize: 11,
+            textHaloColor: '#FFFFFF',
+            textHaloWidth: 1.5,
           ),
         );
       }
@@ -237,6 +338,21 @@ class _MapScreenState extends State<MapScreen> {
         CameraPosition(target: target, zoom: MapConstants.deviceFocusZoom),
       ),
     );
+  }
+
+  Future<void> _animateToUser() async {
+    if (_mapController == null || _isTest) return;
+    if (_userLocation != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(_userLocation!.latitude, _userLocation!.longitude),
+            zoom: MapConstants.userFocusZoom,
+          ),
+        ),
+      );
+    }
+    _fetchUserLocation(animateCamera: _userLocation == null);
   }
 
   void _onSearchChanged(String query) {
@@ -277,7 +393,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
 
-      // Place temporary destination pin
+      // Place destination pin
       try {
         if (_searchPinSymbol != null) {
           await _mapController!.removeSymbol(_searchPinSymbol!);
@@ -290,6 +406,8 @@ class _MapScreenState extends State<MapScreen> {
             textField: place.name,
             textOffset: const Offset(0, 1.2),
             textColor: '#047857',
+            textHaloColor: '#FFFFFF',
+            textHaloWidth: 2.0,
           ),
         );
       } catch (_) {}
@@ -348,7 +466,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Vector tiles provide detailed building footprints, road names and landmarks.',
+                'Vector tiles provide detailed building footprints, road hierarchy and street labels.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 16),
@@ -398,10 +516,8 @@ class _MapScreenState extends State<MapScreen> {
     setState(() => _isRouting = true);
 
     try {
-      // 1. Get user current location
       final userLoc = _userLocation ?? await _locationService.getCurrentLocation();
 
-      // 2. Query Valhalla routing engine
       final route = await _valhallaService.getRoute(
         startLat: userLoc.latitude,
         startLon: userLoc.longitude,
@@ -534,6 +650,20 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Widget _buildCompactMetric(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final devName = _device?.name ?? 'Device';
@@ -595,8 +725,8 @@ class _MapScreenState extends State<MapScreen> {
                             zoom: MapConstants.defaultZoom,
                           ),
                           onMapCreated: _onMapCreated,
-                          myLocationEnabled: true,
-                          myLocationTrackingMode: MyLocationTrackingMode.none,
+                          onStyleLoadedCallback: _onStyleLoaded,
+                          myLocationEnabled: false, // We render our custom high-fidelity navigation GPS puck
                           compassEnabled: true,
                           trackCameraPosition: true,
                           rotateGesturesEnabled: true,
@@ -607,7 +737,7 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                 ),
 
-                // 2. Top Search Bar (Rapido / Swiggy modern floating design)
+                // 2. Top Floating Search Bar (Modern navigation capsule style)
                 Positioned(
                   top: 12,
                   left: 16,
@@ -716,10 +846,10 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
 
-                // 3. Floating Control Action Buttons (Right Side)
+                // 3. Floating Control Action Buttons (Clean right-side stack)
                 Positioned(
                   right: 16,
-                  bottom: 240,
+                  bottom: 175,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -728,24 +858,24 @@ class _MapScreenState extends State<MapScreen> {
                         heroTag: 'map_style_btn',
                         backgroundColor: Colors.white,
                         foregroundColor: AppColors.textPrimary,
-                        elevation: 4,
+                        elevation: 3,
                         tooltip: 'Map Layers',
                         onPressed: _showStyleSelectorSheet,
                         child: const Icon(Icons.layers_rounded, size: 20),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
 
                       // Focus Tracked Device Button
                       FloatingActionButton.small(
                         heroTag: 'focus_device_btn',
                         backgroundColor: Colors.white,
-                        foregroundColor: AppColors.primary,
-                        elevation: 4,
+                        foregroundColor: const Color(0xFF059669),
+                        elevation: 3,
                         tooltip: 'Focus Device',
                         onPressed: _animateToDevice,
                         child: const Icon(Icons.phone_android_rounded, size: 20),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
 
                       // My Location Floating Button (Centers to user's real GPS position)
                       FloatingActionButton(
@@ -754,7 +884,7 @@ class _MapScreenState extends State<MapScreen> {
                         foregroundColor: Colors.white,
                         elevation: 4,
                         tooltip: 'My Location',
-                        onPressed: () => _fetchUserLocation(animateCamera: true),
+                        onPressed: _animateToUser,
                         child: _isLocatingUser
                             ? const SizedBox(
                                 width: 20,
@@ -767,143 +897,99 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
 
-                // 4. Floating Device Info & Operations Card
+                // 4. Compact Device Information & Operations Card (Non-obstructive)
                 Positioned(
                   left: 16,
                   right: 16,
-                  bottom: 24,
-                  child: Card(
-                    elevation: 8,
-                    shadowColor: Colors.black26,
-                    shape: RoundedRectangleBorder(
+                  bottom: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(color: AppColors.border),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.place_rounded, color: AppColors.primary, size: 24),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      devName,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Updated: ${_currentLocation != null ? _currentLocation!.timestamp.toLocal().toString().split('.').first : "Just now"}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              _buildWebSocketStatusBadge(),
-                            ],
-                          ),
-                          const Divider(height: 20, color: AppColors.border),
-
-                          // Coordinates row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Latitude', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${lat.toStringAsFixed(6)}°',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Longitude', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${lon.toStringAsFixed(6)}°',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Accuracy', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '±${(_currentLocation?.accuracy ?? 10.0).toStringAsFixed(1)}m',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          if (_route != null) ...[
-                            const SizedBox(height: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Top info row
+                        Row(
+                          children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.08),
+                                color: const Color(0xFF10B981).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              child: const Icon(Icons.phone_android_rounded, color: Color(0xFF059669), size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.navigation_rounded, color: AppColors.primary, size: 16),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Distance: ${_route!.distanceFormatted}',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
-                                      ),
-                                    ],
+                                  Text(
+                                    devName,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
                                   Text(
-                                    'ETA: ${_route!.durationFormatted}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                    'Updated: ${_currentLocation != null ? _currentLocation!.timestamp.toLocal().toString().split('.').first : "Just now"}',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                   ),
                                 ],
                               ),
                             ),
+                            _buildWebSocketStatusBadge(),
                           ],
-                          const SizedBox(height: 16),
+                        ),
+                        const SizedBox(height: 8),
 
-                          // Valhalla Directions Button
-                          CustomButton(
+                        // Metrics row (Latitude, Longitude, Accuracy)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildCompactMetric('Latitude', '${lat.toStringAsFixed(4)}°'),
+                            _buildCompactMetric('Longitude', '${lon.toStringAsFixed(4)}°'),
+                            _buildCompactMetric('Accuracy', '±${(_currentLocation?.accuracy ?? 10.0).toStringAsFixed(1)}m'),
+                            if (_route != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${_route!.distanceFormatted} • ${_route!.durationFormatted}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Compact Valhalla Routing Button
+                        SizedBox(
+                          height: 38,
+                          child: CustomButton(
                             text: 'Route with Valhalla',
                             icon: Icons.directions_outlined,
                             isLoading: _isRouting,
                             onPressed: _fetchValhallaRoute,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
